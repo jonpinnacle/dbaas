@@ -1,0 +1,5 @@
+- name: install pre Installation on mssql Physical Machine
+#  hosts: Physical-Windows
+  hosts: '{{ host }}'
+  roles:
+     - Physical-Pre-Installation

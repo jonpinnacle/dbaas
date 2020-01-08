@@ -1,0 +1,37 @@
+---
+
+- import_tasks: get_db_id.yml
+  vars: #i think we need to pass this as var but we haven't done this in oracle
+    mssql_db_name: "{{ mssql_db_name }}"
+  when: db_id is not defined
+
+- name: Checklist Insert
+  block:
+    - name: POST To Insert into Checklist Details
+      win_uri:
+        url: "{{ apex_url }}/mssql_check_list"
+        validate_certs: no  # should be removed after https certs becomes renewed
+        method: POST
+        body_format: json
+        body:
+            db_name: "{{ db_name }}"
+        status_code: 
+          - 200
+          - 201
+        return_content: yes
+        headers:
+          Content-Type: "application/json"
+      register: checklist_insrt_response
+      
+    - name: set checklist_id
+      set_fact:
+        checklist_id: "{{ checklist_insrt_response.json | json_query('ID') }}"
+
+  rescue:
+    - name: Store the Json If APEX Server Is Down
+      delegate_to: localhost
+      win_lineinfile:
+        path: "{{ json_backup_dir }}/{{ oracle_db_name }}_db_chklst_updates.json"
+        line: '{ "db_id": "{{ db_id }}", "update": {{ db_chklst_json_body | to_json }} }'
+        create: yes
+      when: checklist_insrt_response.status_code == 500 or checklist_insrt_response.status_code == -1

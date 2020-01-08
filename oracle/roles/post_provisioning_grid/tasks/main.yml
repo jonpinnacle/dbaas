@@ -1,0 +1,11 @@
+---
+- include_vars: secrets.yml
+  no_log: true
+
+- name: check if post_provisioning_done check file exists
+  stat:
+    path: "{{ oracle_base }}/admin/.post_provisioning_done_{{ ansible_hostname }}"
+  register: post_provisioning_done_gi
+
+- include_tasks: post_provision_grid.yml
+  when: post_provisioning_done_gi.stat.exists ==false

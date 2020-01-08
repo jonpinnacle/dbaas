@@ -1,0 +1,11 @@
+---
+# tasks file for oracle_catalog
+- name: "insert the {{ catalog_dest_type }} catalog"
+  import_role:
+    name: dbaas_api_services
+    tasks_from: catalog_process_api.yml
+  vars:
+    catalog_dest: "{{ catalog_dest_type }}"
+    json_catalog: "{{ lookup('template', 'catalog.j2') }}"
+  tags:
+  - apex_api

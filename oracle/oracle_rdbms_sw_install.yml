@@ -1,0 +1,17 @@
+---
+- name: install oracle database
+  hosts: '{{ host }}'
+  become: yes
+  tasks:
+  - import_role:
+      name: oracle_rdbms_install
+
+  - set_stats:
+      data:
+        oracle_db_home: "{{ oracle_db_home }}"
+    run_once: true
+
+  ## Optional vars
+  # oracle_version (default: 12.1.0.2) 
+  # oracle_db_home (default: auto-generated based on next available; e.g. db_2)
+  # oracle_images (default: ['linuxamd64_12102_database_1of2.zip','linuxamd64_12102_database_2of2.zip'])

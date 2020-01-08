@@ -1,0 +1,17 @@
+- name: Installation on mssql Physical Machine
+  hosts: win
+  tasks:
+    - import_role:
+        name: mssql_api_services
+        tasks_from: cluster_checklist_insertion.yml
+      vars:
+        cluster_membr_body:
+          cluster_name: "test"
+          gi_version: "0.0"
+          env_source: "TWC"
+
+# - hosts: win
+#   gather_facts: true
+#   tasks:
+#     - debug: var=vars
+#     - debug: var=hostvars[inventory_hostname]

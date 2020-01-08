@@ -1,0 +1,59 @@
+:setvar PrimaryReplica {{ PrimaryReplica }} 
+:setvar SecondaryReplica {{ SecondaryReplica }} 
+:setvar DrReplica {{ DrReplica }} 
+:setvar EndPointPort {{ EndPointPort }}
+:setvar AvailabilityGroup {{ AvailabilityGroup }}
+:setvar Listener {{ Listener }} 
+:setvar IPListener {{ IPListener }}
+:setvar IPListener2 {{ IPListener2 }}
+:setvar ListenerPort {{ ListenerPort }}
+:setvar ListenerSubnet {{ ListenerSubnet }} 
+:setvar ListenerSubnet2 {{ ListenerSubnet2 }}
+
+:Connect $(PrimaryReplica)
+ 
+USE [master]
+GO
+ 
+declare @SystemAddressPrimary nvarchar(256)
+declare @SystemAddressSecondary nvarchar(256)
+declare @SystemAddressDr nvarchar(256)
+ 
+if charindex('','$(PrimaryReplica)')=0
+ set @SystemAddressPrimary='$(PrimaryReplica)'
+else
+ select @SystemAddressPrimary=substring('$(PrimaryReplica)',0,charindex('','$(PrimaryReplica)'))
+ 
+if charindex('','$(SecondaryReplica)')=0
+ set @SystemAddressSecondary='$(SecondaryReplica)'
+else
+ select @SystemAddressSecondary=substring('$(SecondaryReplica)',0,charindex('','$(SecondaryReplica)'))
+
+if charindex('','$(DrReplica)')=0
+ set @SystemAddressDr='$(DrReplica)'
+else
+ select @SystemAddressDr=substring('$(DrReplica)',0,charindex('','$(DrReplica)'))
+
+declare @CMD nvarchar(max)
+set @CMD='
+CREATE AVAILABILITY GROUP [$(AvailabilityGroup)]
+WITH (AUTOMATED_BACKUP_PREFERENCE = SECONDARY)
+FOR 
+REPLICA ON N''$(DrReplica)'' WITH (ENDPOINT_URL = N''TCP://' + @SystemAddressDr + ':$(EndPointPort)'', FAILOVER_MODE = MANUAL, AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = NO)),
+ N''$(PrimaryReplica)'' WITH (ENDPOINT_URL = N''TCP://' + @SystemAddressPrimary + ':$(EndPointPort)'', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = READ_ONLY)),
+ N''$(SecondaryReplica)'' WITH (ENDPOINT_URL = N''TCP://' + @SystemAddressSecondary + ':$(EndPointPort)'', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = READ_ONLY));'
+ 
+print 'Create the availability group...'
+PRINT @CMD
+exec sp_executesql @CMD
+ 
+print 'Create the availability group listener...'
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ADD LISTENER N'$(Listener)' (
+WITH IP
+((N'$(IPListener)', N'$(ListenerSubnet)'),
+(N'$(IPListener2)', N'$(ListenerSubnet2)')
+)
+, PORT=$(ListenerPort));
+ 
+GO

@@ -1,0 +1,10 @@
+---
+
+- name: Copy the Backward Compatibility Objects file
+  win_template:
+     src: ../templates/Backward-Compatibility-Objects.j2
+     dest: c:\Ansible\Temp\Backward-Compatibility-Objects.ps1
+  
+- name: Install Backward Compatibility Objects
+  win_shell: |
+    C:\Ansible\Temp\Backward-Compatibility-Objects.ps1 > C:\Ansible\Logs\Backward-Compatibility-Objects.log

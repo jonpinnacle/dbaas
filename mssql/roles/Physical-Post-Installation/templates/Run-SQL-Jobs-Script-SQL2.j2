@@ -1,0 +1,70 @@
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Backup ETL Configs') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Backup ETL Configs', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - MAINTENANCE CHECKALLOC') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - MAINTENANCE CHECKALLOC', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - MAINTENANCE CHECKCATALOG') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - MAINTENANCE CHECKCATALOG', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - MAINTENANCE CHECKDB') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - MAINTENANCE CHECKDB', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Move Error Logs') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Move Error Logs', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Native Backup Full') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Native Backup Full', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Recycle SQL Error Logs') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Recycle SQL Error Logs', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Update Statistics') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Update Statistics', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - User DBReindex') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - User DBReindex', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - All Database Backups') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - All Database Backups', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Checkdb') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Checkdb', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - CompressDb') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - CompressDb', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Cycle Error Log') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Cycle Error Log', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Database Optimizations') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Database Optimizations', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Delete Old Log Files') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Delete Old Log Files', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Disater Recovery Preperation') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Disater Recovery Preperation', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Hourly Transaction Log Backup') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Hourly Transaction Log Backup', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+
+Sqlcmd -S {{ ansible_hostname }} -d "msdb" -E -x -i "D:\Install\SQL-CFG\SQL2008Jobs.sql"

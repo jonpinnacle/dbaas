@@ -1,0 +1,22 @@
+---
+
+- block:
+  - name: execute rootupgrade post-installation script
+    command: "{{ oracle_grid_home }}/rootupgrade.sh"
+    register: rootupgrade_script
+    tags: upgrade_script 
+
+  always:
+  - name: save rootupgrade script stdout
+    copy:
+      dest: "{{ oracle_tmp }}/rootupgrade_script_grid.out"
+      content: "{{ rootupgrade_script.stdout | default('') }}"
+    when: rootupgrade_script.changed
+    tags: upgrade_script 
+
+  - name: save rootupgrade script  stderr
+    copy:
+      dest: "{{ oracle_tmp }}/rootupgrade_script_grid.err"
+      content: "{{ rootupgrade_script.stderr | default('') }}"
+    when: rootupgrade_script.changed
+    tags: upgrade_script 

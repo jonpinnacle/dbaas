@@ -1,0 +1,1 @@
+create pfile from spfile;

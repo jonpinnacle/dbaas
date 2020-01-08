@@ -1,0 +1,2 @@
+---
+master_node: "{{ ansible_play_hosts | sort | first }}"

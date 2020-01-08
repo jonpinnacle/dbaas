@@ -1,0 +1,16 @@
+---
+
+- name: upgrade oracle 11g database to 12c database
+  hosts: '{{ host }}'
+  any_errors_fatal: true
+  become: yes
+  tasks:
+  - import_role:
+      name: oracle_upgrade
+  
+  ## Required Vars
+  # oracle_db_home - This is where the upgrade will be move to (e.g. db_1) 
+  # oracle_db_name - The db to be upgraded
+
+  ## Optional vars
+  # oracle_version (default: 12.1.0.2) 

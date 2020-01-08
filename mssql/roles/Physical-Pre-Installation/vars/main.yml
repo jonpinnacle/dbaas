@@ -1,0 +1,25 @@
+---
+# Need to uncomment this entry while running on charter lab
+UName: "{%- if Domain == 'CHTR' -%}chtr\\svc_sqlmail
+        {%- elif Domain =='TWCCORP' -%}TWCCORP\\SVSQLPRD
+        {%- elif Domain =='TWCDMZ' -%}TWCDMZ\\SVSQLPRD
+        {%- elif Domain =='UAT' -%}UAT\\svc_sqlmail
+        {%- elif Domain =='DEV' -%}DEV\\svc_sqlmail
+        {%- elif Domain =='Corp' -%}CORP\\sqlman
+        {%- endif %}"
+
+sql_bin_zips:
+  - SQL{{ SqlVersion }}.zip
+  - SQL-CFG.zip
+
+######################################
+## The following Vars are found in  ##
+## vars/Physical-Secrets.yml        ##
+##                                  ##
+## FTP Server Details               ##
+##  - unc_password                  ##
+## local DB Sa password             ##
+##  - SaPw                          ##
+## SQL MGT Server Details           ##
+##  - password                      ##
+######################################

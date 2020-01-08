@@ -1,0 +1,11 @@
+---
+
+oracle_version: 12.1.0.2
+
+oracle_db_name: +ASM
+
+install_base: /u01/app
+
+oracle_base: "{{ install_base }}/oracle"
+
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB

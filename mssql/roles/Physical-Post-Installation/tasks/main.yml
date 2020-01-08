@@ -1,0 +1,166 @@
+---
+- include_vars: Physical-Secrets.yml
+  no_log: False
+
+- name:  SystemRequirement
+  win_shell: |
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO') | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.ConnectionInfo') | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SqlWmiManagement') | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.ManagedDTS') | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.AnalysisServices") | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SqlWmiManagement") | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.VisualBasic') | Out-Null
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.Management.PowerShell.sqlps') | Out-Null
+    # Load the IntegrationServices Assembly
+    [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.IntegrationServices") | Out-Null
+    Set-ExecutionPolicy Unrestricted -Force
+
+#Powershell 5.0 or higher is needed.
+- name: Import Module Carbon,DBATools and SQLPS
+  win_psmodule:
+    name: "{{ modules }}"
+    state: present
+  loop:
+  - Carbon
+  - DBATools
+  - SQLPS
+  loop_control:
+    loop_var: modules
+
+#- include: InsertRow-ServerListTable.yml
+
+#- include: Change-SQL-Services-to-use-domain-svc-acct.yml
+
+- name: Set Memory
+  win_shell: |
+    $Mem = gwmi Win32_OperatingSystem | % { $_.TotalVisibleMemorySize }
+    $MaxMem = [System.Math]::Round(($mem/1024) * .8, 0)
+    $MinMem = [System.Math]::Round($maxmem * .5, 0)
+
+    $Qry = "EXEC sys.sp_configure N'show advanced options', N'1'  RECONFIGURE WITH OVERRIDE EXEC sys.sp_configure N'max server memory (MB)', N'$MaxMem' RECONFIGURE WITH OVERRIDE EXEC sys.sp_configure N'min server memory (MB)', N'$MinMem' RECONFIGURE WITH OVERRIDE EXEC sys.sp_configure N'show advanced options', N'0'  RECONFIGURE WITH OVERRIDE"
+
+    Invoke-SqlCmd -query $Qry -serverinstance "{{ ansible_hostname }}" -database "master"
+
+##################################################################
+## We may be able to get some of this from the ansible hostvars ##
+## but the SQL to set the Max Dop will still need win_shell     ##
+##################################################################
+- name: Set Max Dop
+  win_shell: |
+    #our core vale is 1 1
+    $totalcores = $(Get-WmiObject -class win32_processor).numberofcores
+    If ("$totalcore" -gt "1"){ $allcores = ($totalcores | Measure-Object -Sum).Sum } else { $allcores = $totalcores }
+
+    $MaxDop = [System.Math]::Round($allcores/1.5, 0)
+    If ($MaxDop -gt 8) { $MaxDop = "8" }
+    $Qry = "EXEC sys.sp_configure N'show advanced options', N'1'  RECONFIGURE WITH OVERRIDE EXEC sys.sp_configure N'max degree of parallelism', N'$MaxDop' RECONFIGURE WITH OVERRIDE EXEC sys.sp_configure N'show advanced options', N'0'  RECONFIGURE WITH OVERRIDE"
+    $allcores
+    $totalcores
+    $Qry
+
+    Invoke-SqlCmd -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+  register: output
+
+- set_fact:
+    Allcores: "{{ output.stdout_lines[0] }}"
+
+- include: Alter-tempdb.yml
+
+#- name: Run SQL Configuration Script
+#  win_shell: |
+#    SQLCMD -S {{ ansible_hostname }} -d "master" -E -x -i "D:\Install\SQL-CFG\SqlCfg.sql"
+#
+#    $Qry = "EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', N'Software\Microsoft\MSSQLServer\MSSQLServer', N'BackupDirectory', REG_SZ, N'{{ BuPath }}\MSSQL\backups'"
+#
+#    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password "{{ SaPw }}"
+#  register: run_sql
+#  no_log: false
+#
+#- name: Protected Output - Run SQL Configuration Script
+#  debug:
+#    var: "run_sql | combine({'cmd': run_sql.cmd | replace(SaPw, '<PASSWORD HIDDEN>') | replace(password, '<PASSWORD HIDDEN>')})"
+#  failed_when: run_sql.rc
+
+- include: Configure-SSIS-Catalog.yml
+
+- include: Optimize-System-Databases.yml
+
+- include: Import-Client-Parameters.yml
+
+- include: Run-SQL-Jobs-Script.yml
+
+- include: Install-updated-code.yml
+
+- include: Enable-TCP-and-Set-port.yml
+
+- name: Stop SQL service
+  win_service:
+    name: MSSQLSERVER
+    state: stopped
+    force_dependent_services: yes
+
+- name: Remove old tempdb Directory
+  win_file:
+    path: '{{ TempdbPath }}\MSSQL\Data'
+    state: absent
+
+- name: Create Directory
+  win_file:
+    path: '{{ TempdbPath }}\MSSQL\Data'
+    state: directory
+
+- include: Install-SSMS.yml
+  when: SqlVersion == 2017 or SqlVersion == 2016
+
+- name: Turn On Smartscreen
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer
+    name: SmartScreenEnabled
+    type: string
+    data: Prompt
+  tags:
+  - smartscreen
+
+- name: Remove ansible temp Directory
+  win_file:
+    path: 'C:\Ansible\Temp'
+    state: absent
+
+- name: Set Standalone True if PrimaryReplica not defined
+  set_fact:
+    standalone: True
+  when: PrimaryReplica | length == 0
+
+- name: Reboot All for Standalone
+  win_reboot:
+    pre_reboot_delay: 10
+    post_reboot_delay: 20
+    test_command: whoami
+    reboot_timeout: 600
+    msg: Reboot initiated by Ansible
+    connect_timeout: 5
+  when: standalone is defined
+
+- name: Not Standalone Block
+  block:
+  - name: Reboot Primary Server
+    win_reboot:
+      pre_reboot_delay: 10
+      post_reboot_delay: 20
+      test_command: whoami
+      reboot_timeout: 600
+      msg: Reboot initiated by Ansible
+      connect_timeout: 5
+    when: ((ansible_hostname | lower ) == ( PrimaryReplica | lower )) and (standalone is not defined)
+
+  - name: Reboot Secondary Servers
+    win_reboot:
+      pre_reboot_delay: 20
+      post_reboot_delay: 10
+      test_command: whoami
+      reboot_timeout: 600
+      msg: Reboot initiated by Ansible
+      connect_timeout: 5
+    when: (ansible_hostname | lower ) != ( PrimaryReplica | lower ) and (standalone is not defined)
+  when: standalone is not defined

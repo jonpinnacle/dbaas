@@ -1,0 +1,197 @@
+:Connect {{ SecondaryReplica }}
+ 
+USE [master]
+GO
+declare @AVGLogin as sysname
+declare @CMD nvarchar(max)
+ 
+select @AVGLogin=service_account from sys.dm_server_services
+where servicename like 'SQL Server (%'
+ 
+if not exists(select name from sys.syslogins where name=@AVGLogin)
+begin
+ set @CMD=N'CREATE LOGIN [' + @AVGLogin + '] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]'
+ print 'Create service account as server login...'
+ exec sp_executesql @CMD
+end
+ 
+if not exists (select name from sys.endpoints where name='Hadr_endpoint')
+begin
+print 'Create HA/DR endpoint...'
+CREATE ENDPOINT [Hadr_endpoint] 
+ AS TCP (LISTENER_PORT = {{ ListenerPort }})
+ FOR DATA_MIRRORING (ROLE = ALL, ENCRYPTION = REQUIRED ALGORITHM AES)
+end
+ 
+IF (SELECT state FROM sys.endpoints WHERE name = N'Hadr_endpoint') <> 0
+BEGIN
+ ALTER ENDPOINT [Hadr_endpoint] STATE = STARTED
+END
+ 
+ 
+set @CMD=N'GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [' + @AVGLogin + ']'
+print 'GRANT CONNECT ON ENDPOINT...'
+exec sp_executesql @CMD
+ 
+GO
+ 
+:Connect {{ PrimaryReplica }}
+ 
+USE [master]
+GO
+ 
+declare @AVGLogin as sysname
+declare @CMD nvarchar(max)
+ 
+select @AVGLogin=service_account from sys.dm_server_services
+where servicename like 'SQL Server (%'
+ 
+if not exists(select name from syslogins where name=@AVGLogin)
+begin
+ set @CMD=N'CREATE LOGIN [' + @AVGLogin + '] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]'
+ print 'Create service account as server login...'
+ exec sp_executesql @CMD
+end
+ 
+if not exists (select name from sys.endpoints where name='Hadr_endpoint')
+begin
+print 'Create HA/DR endpoint...'
+CREATE ENDPOINT [Hadr_endpoint] 
+ AS TCP (LISTENER_PORT = {{ ListenerPort }})
+ FOR DATA_MIRRORING (ROLE = ALL, ENCRYPTION = REQUIRED ALGORITHM AES)
+end
+ 
+IF (SELECT state FROM sys.endpoints WHERE name = N'Hadr_endpoint') <> 0
+BEGIN
+ ALTER ENDPOINT [Hadr_endpoint] STATE = STARTED
+END
+ 
+set @CMD=N'GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [' + @AVGLogin + ']'
+print 'GRANT CONNECT ON ENDPOINT...'
+exec sp_executesql @CMD
+ 
+GO
+ 
+:Connect {{ SecondaryReplica }}
+ 
+IF EXISTS(SELECT * FROM sys.server_event_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER WITH (STARTUP_STATE=ON);
+END
+IF NOT EXISTS(SELECT * FROM sys.dm_xe_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER STATE=START;
+END
+ 
+GO
+ 
+:Connect {{ PrimaryReplica }}
+ 
+IF EXISTS(SELECT * FROM sys.server_event_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER WITH (STARTUP_STATE=ON);
+END
+IF NOT EXISTS(SELECT * FROM sys.dm_xe_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER STATE=START;
+END
+ 
+GO
+ 
+:Connect {{ SecondaryReplica }}
+ 
+USE [master]
+GO
+ 
+declare @SystemAddressPrimary nvarchar(256)
+declare @SystemAddressSecondary nvarchar(256)
+ 
+if charindex('','{{ SecondaryReplica }}')=0
+ set @SystemAddressPrimary='{{ SecondaryReplica }}'
+else
+ select @SystemAddressPrimary=substring('{{ SecondaryReplica }}',0,charindex('','{{ SecondaryReplica }}'))
+ 
+if charindex('','{{ PrimaryReplica }}')=0
+ set @SystemAddressSecondary='{{ PrimaryReplica }}'
+else
+ select @SystemAddressSecondary=substring('{{ PrimaryReplica }}',0,charindex('','{{ PrimaryReplica }}'))
+ 
+declare @CMD nvarchar(max)
+set @CMD='
+CREATE AVAILABILITY GROUP [VS0]
+WITH (AUTOMATED_BACKUP_PREFERENCE = PRIMARY)
+FOR 
+REPLICA ON N''{{ SecondaryReplica }}'' WITH (ENDPOINT_URL = N''TCP://' + @SystemAddressPrimary + ':{{ EndPointPort }}'', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = READ_ONLY)),
+ N''{{ PrimaryReplica }}'' WITH (ENDPOINT_URL = N''TCP://' + @SystemAddressSecondary + ':{{ EndPointPort }}'', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = READ_ONLY));'
+ 
+print 'Create the availability group...'
+exec sp_executesql @CMD
+ 
+print 'Create the availability group listener...'
+ALTER AVAILABILITY GROUP [VS0]
+ADD LISTENER N'{{ Listener }}' (
+WITH IP
+((N'10.10.98.150', N'255.255.255.0')
+)
+, PORT={{ ListenerPort }});
+ 
+GO
+ 
+:Connect {{ PrimaryReplica }}
+ 
+ALTER AVAILABILITY GROUP [VS0] JOIN;
+ 
+GO
+
+:Connect {{ SecondaryReplica }}
+ 
+USE [master]
+GO
+ 
+DECLARE @SystemAddressPrimary NVARCHAR(256)
+DECLARE @SystemAddressSecondary NVARCHAR(256)
+ 
+IF CHARINDEX('','{{ SecondaryReplica }}')=0
+ SET @SystemAddressPrimary='{{ SecondaryReplica }}'
+ELSE
+ SELECT @SystemAddressPrimary=SUBSTRING('{{ SecondaryReplica }}',0,CHARINDEX('','{{ SecondaryReplica }}'))
+ 
+IF CHARINDEX('','{{ PrimaryReplica }}')=0
+ SET @SystemAddressSecondary='{{ PrimaryReplica }}'
+ELSE
+ SELECT @SystemAddressSecondary=SUBSTRING('{{ PrimaryReplica }}',0,CHARINDEX('','{{ PrimaryReplica }}'))
+ 
+DECLARE @CMD NVARCHAR(MAX)
+
+SET @CMD = 'ALTER AVAILABILITY GROUP [VS0]
+ MODIFY REPLICA ON
+N''{{ SecondaryReplica }}'' WITH 
+(SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY));
+
+ALTER AVAILABILITY GROUP [VS0]
+ MODIFY REPLICA ON
+N''{{ SecondaryReplica }}'' WITH 
+(SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N''TCP://' + @SystemAddressPrimary + '.{{ EAG_domain }}:{{ ListenerPort }}''));
+
+ALTER AVAILABILITY GROUP [VS0]
+ MODIFY REPLICA ON
+N''{{ PrimaryReplica }}'' WITH 
+(SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY));
+
+ALTER AVAILABILITY GROUP [VS0]
+ MODIFY REPLICA ON
+N''{{ PrimaryReplica }}'' WITH 
+(SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N''TCP://' + @SystemAddressSecondary + '.{{ EAG_domain }}:{{ ListenerPort }}''));
+
+ALTER AVAILABILITY GROUP [VS0]
+MODIFY REPLICA ON
+N''{{ SecondaryReplica }}'' WITH 
+(PRIMARY_ROLE (READ_ONLY_ROUTING_LIST=(N''{{ PrimaryReplica }}'',N''{{ SecondaryReplica }}'')));
+
+ALTER AVAILABILITY GROUP [VS0]
+MODIFY REPLICA ON
+N''{{ PrimaryReplica }}'' WITH 
+(PRIMARY_ROLE (READ_ONLY_ROUTING_LIST=(N''{{ SecondaryReplica }}'',N''{{ PrimaryReplica }}'')));'
+
+--PRINT @CMD
+EXEC sp_executesql @CMD

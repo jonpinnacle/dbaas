@@ -1,0 +1,32 @@
+- name: Import Client Parameters
+  win_shell: |
+    $Qry = "TRUNCATE TABLE [SQLDBA].[dbo].[Parameters]"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "CREATE TABLE HOLDING.[dbo].[Temp]([Pname] [varchar](50) NULL,[PValue] [varchar](500) NULL,[Notes] [varchar](500) NULL,) ON [PRIMARY]"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "BULK INSERT HOLDING.dbo.Temp FROM 'D:\Install\SQL-CFG\Hyperv-SQL2012-Parameters.csv' WITH (FIELDTERMINATOR = ',',ROWTERMINATOR = '\n')" 
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "INSERT INTO [SQLDBA].[dbo].[Parameters] ([Pname],[PValue],[Notes]) SELECT [Pname],[PValue],[Notes] FROM [HOLDING].[dbo].[Temp]"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "DROP TABLE [HOLDING].[dbo].[Temp]"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "UPDATE [SQLDBA].[dbo].[Parameters]
+            SET [PValue] = REPLACE([PValue],'{{ BuPath }}MSSQL\Backup\','{{ BuPath }}MSSQL\Backups\')"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    If ("{{ SqlVersion }}" -eq "2014")
+    {
+        $Qry = "UPDATE [SQLDBA].[dbo].[Parameters]
+        SET [PValue] = REPLACE([PValue],'{{ SystemPath }}MSSQL11.MSSQLSERVER\','{{ SystemPath }}MSSQL12.MSSQLSERVER\')"
+    }
+    If ("{{ SqlVersion }}" -eq "2016")
+    {
+        $Qry = "UPDATE [SQLDBA].[dbo].[Parameters]
+        SET [PValue] = REPLACE([PValue],'{{ SystemPath }}MSSQL11.MSSQLSERVER\','{{ SystemPath }}MSSQL13.MSSQLSERVER\')"
+    }
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"

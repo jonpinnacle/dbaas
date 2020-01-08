@@ -1,0 +1,55 @@
+---
+- name: create the oracle installer directory to the oracle user
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}/database"
+    state: directory
+    recurse: yes
+
+- name: create the path to store the RDBMS files
+  file:
+    path: "{{ oracle_installer_path }}/RDBMS/{{ oracle_version }}"
+    state: directory
+    recurse: yes
+
+- name: check for the marker
+  stat:
+    path: "{{ oracle_tmp }}/database/copied"
+  register: unzipped
+  ignore_errors: yes
+
+- name: get RDBMS installer files from S3
+  aws_s3:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    bucket: gfcloudsoftwarerepo
+    object: "ORACLE_DB/RDBMS/{{ db_zipfile }}"
+    dest: "{{ oracle_installer_path }}/RDBMS/{{ oracle_version }}/{{ db_zipfile }}"
+    mode: get
+  when:
+  - inventory_hostname == master_node
+  - unzipped.stat.exists == false
+  loop: "{{ oracle_images }}"
+  loop_control:
+    loop_var: db_zipfile
+
+- name: unzip installer
+  unarchive: 
+    src: "{{ oracle_installer_path }}/RDBMS/{{ oracle_version }}/{{ db_zipfile }}" 
+    dest: "{{ oracle_tmp }}" 
+    remote_src: yes 
+    keep_newer: true
+    validate_certs: no
+  when: 
+  - inventory_hostname == master_node
+  - unzipped.stat.exists == false
+  loop: "{{ oracle_images }}"
+  loop_control:
+    loop_var: db_zipfile
+  
+- name: place a marker for the completion
+  file:
+    path: "{{ oracle_tmp }}/database/copied"
+    state: touch
+  when: unzipped.stat.exists == false

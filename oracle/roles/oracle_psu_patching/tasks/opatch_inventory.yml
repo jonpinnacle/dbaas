@@ -1,0 +1,37 @@
+---
+- name: Check Opatch Inventory
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  command: opatch lsinventory
+  register: opatch_lsinv
+  changed_when: False
+
+- name: save opatch inventory stdout
+  copy:
+    dest: "{{ oracle_tmp }}/opatch_lsinv.out"
+    content: "{{ opatch_lsinv.stdout }}"
+  changed_when: False
+
+- name: save opatch inventory stderr
+  copy:
+    dest: "{{ oracle_tmp }}/opatch_lsinv.err"
+    content: "{{ opatch_lsinv.stderr }}"
+  changed_when: False
+  when: opatch_lsinv.stderr_lines | length > 0
+
+- name: detemine success of opatch apply
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  shell: opatch lsinventory | grep {{ psu_version }}
+  register: opatch_lsinv_success
+  changed_when: False
+
+- name: host checklist post for Patching
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_patch_upload_lsinv.yml
+  vars:
+    logfile_path: "{{ oracle_tmp }}/opatch_lsinv.out"
+    
+  tags:
+  - apex_api

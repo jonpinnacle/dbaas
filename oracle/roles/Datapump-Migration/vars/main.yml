@@ -1,0 +1,26 @@
+---
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+HOST_COUNT: "{{ ansible_play_hosts | length }}"
+
+source_oracle_home: "{{ oracle_base }}/product/{{ oracle_version }}/{{ source_db_home }}"
+
+dest_oracle_home: "{{ oracle_base }}/product/{{ oracle_version }}/{{ dest_db_home }}"
+
+# shell environment for the oracle user
+source_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ source_db_name }}"
+  ORACLE_UNQNAME: "{{ source_db_name }}"
+  ORACLE_HOME: "{{ source_oracle_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ source_oracle_home }}/bin:{{ ansible_env.PATH }}"
+
+# shell environment for the oracle user
+dest_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ dest_db_name }}"
+  ORACLE_UNQNAME: "{{ dest_db_name }}"
+  ORACLE_HOME: "{{ dest_oracle_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ dest_oracle_home }}/bin:{{ ansible_env.PATH }}"

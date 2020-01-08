@@ -1,0 +1,27 @@
+---
+
+oracle_context: GRID #DATABASE only other option
+
+grid_version: 12.1.0.2
+
+oracle_version: 12.1.0.2
+
+# location for temporary installation files
+oracle_tmp: /u01/tmp/oracle_admin
+
+install_base: /u01/app
+
+oracle_base: "{% if oracle_context == 'GRID' -%}{{ install_base }}
+             {%- else -%}{{ install_base }}/oracle
+             {%- endif %}"
+
+oracle_db_name: ''
+
+grid_db_name: +ASM
+
+oracle_sid: "{% if oracle_context == 'GRID' -%}{{ grid_db_name }}
+             {%- else -%}{{ oracle_db_name }}
+             {%- endif %}"
+
+oracle_db_home: db_1
+

@@ -1,0 +1,9 @@
+Rem NAME
+Rem checkcomp.sql
+Rem This is to check the component status to make sure all are in valid state
+Rem and version must be 12.1.0.2
+Rem Modified
+Rem kamos 8/1/2019 created
+ select Comp_id, version, status from dba_registry;
+exit
+EOF

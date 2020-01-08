@@ -1,0 +1,261 @@
+---
+# - name: db checklist post update for post provisioning for db
+#   include_tasks: db_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: True
+#       host_name: "{{ ansible_hostname }}"
+#       db_name: "{{ oracle_db_name }}"
+#       checklist_type: "POST PROVISIONING for DB"
+#       ticket_ref: "{{ ticket_ref }}"
+#       checklist_category: POST PROVISION
+#       post_build_status: STARTED
+#       task_desc: post provisioning
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for Post DB Provisioning
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ oracle_db_name }}"
+    task_area: "POST PROVISION Database"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "POST PROVISIONING Database for {{ oracle_db_name }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- name: create tmp dir
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}"
+    state: directory
+    recurse: yes
+
+- name: get asm_sid
+  shell: ps -ef | grep smon | grep ASM | grep -v grep | awk '{ print $8 }'
+  register: ps_grep_smon
+  changed_when: False
+
+- name: set asm_sid
+  set_fact:
+    asm_sid: "{{ ps_grep_smon.stdout | regex_replace('asm_smon_(.*)', '\\1') }}"
+
+- name: get oracle grid home
+  shell: "ps -ef | grep ohasd | grep /u01/app/12.1.0.2/ |  grep -v grep | awk -F ' ' '{ print $8 }'"
+  register: oracle_ohasd_process
+
+- name: set grid home
+  set_fact:
+    oracle_grid_home: "{{ oracle_ohasd_process.stdout | regex_replace('/bin/ohasd.bin', '') }}"
+
+- name: get oracle_sid
+  shell: ps -ef | grep ora_smon | grep {{ oracle_db_name }} | grep -v grep | awk '{ print $8 }'
+  register: ps_grep_smon
+  changed_when: False
+
+- name: set oracle_sid
+  set_fact:
+    oracle_sid: "{{ ps_grep_smon.stdout | regex_replace('ora_smon_(.*)', '\\1') }}"
+
+- name: get db details
+  shell: grep "^{{ oracle_db_name }}:" /etc/oratab | awk 'NR == 1'
+  ignore_errors: yes
+  changed_when: false
+  register: db_details
+
+- name: set oracle_home
+  set_fact:
+    oracle_home: "{{ db_details.stdout | regex_replace('^[^:]*:([^:]*).*', '\\1') }}"
+
+- name: to get the database name in each node of rac
+  block:
+    - name: get the database name in rac
+      become_user: '{{ oracle_user }}'
+      environment: "{{ ora_user_env }}"
+      shell: srvctl config database -d {{ oracle_db_name }} | grep -e "instance" | awk -F ':' '{ print $2 }'
+      register: rac_database_name
+
+    - name: set rac_oracle_db_name
+      set_fact:
+        rac_oracle_db_name: "{{ rac_database_name.stdout | trim }}"
+  when: '(ansible_play_hosts | length) > 1'
+
+# api call does not exist (yet)
+#- name: db checklist post update for post provisioning for db
+#  include_tasks: db_checklist_post_update.yml
+#  vars:
+#    chklst_json_body:
+#      new_entry: True
+#      host_name: "{{ ansible_hostname }}"
+#      db_name: "{{ oracle_db_name }}"
+#      ticket_ref: "{{ ticket_ref }}"
+#      #ID: "{{ checklist_id }}"
+#      checklist_type: POST PROVISIONING for DB
+#      checklist_category: POST PROVISION
+#      post_build_status: "FAILED"
+#  when:
+#    - oracle_home == ""
+#    - oracle_sid == ""
+#  tags:
+#  - apex_api
+
+- fail:
+    msg: Database named {{ oracle_db_name }} doesn't exists since oracle_home and oracle_sid is not set properly'
+  when:
+    - oracle_home == ""
+    - oracle_sid == ""
+
+# api call does not exist (yet)
+#- name: db checklist post update for post provisioning for db
+#  include_tasks: db_checklist_post_update.yml
+#  vars:
+#    chklst_json_body:
+#      new_entry: True
+#      host_name: "{{ ansible_hostname }}"
+#      db_name: "{{ oracle_db_name }}"
+#      #ID: "{{ checklist_id }}"
+#      checklist_type: POST PROVISIONING for DB
+#      checklist_category: POST PROVISION
+#      post_build_status: "IN PROGRESS"
+#      ticket_ref: "{{ ticket_ref }}"
+#      task_desc: setting up cleanup_files.ctl
+#  tags:
+#  - apex_api
+
+- name: complete block of post Provisioning validation
+  block:
+    - name: Insert a line at the end of a file.
+      lineinfile:
+        path: "{{ oracle_base }}/admin/ctl/cleanup_files.ctl"
+        line: "{{ cleanup_file_line }}"
+      loop:
+        - /u01/app/oracle/diag/rdbms/{{ oracle_db_name }}/{{ oracle_sid }}/trace:alert_{{ oracle_sid }}.log:archive:clear:7:100
+        - /u01/app/oracle/admin/{{ oracle_db_name }}/adump:*aud:delete:none:1:0
+      loop_control:
+        loop_var: cleanup_file_line
+
+    - name: Execute Post Provisioning
+      include_tasks: "{{ filename }}"
+      loop:
+        - post_provisioning_sql.yml
+        - adrci_setup.yml
+      loop_control:
+        loop_var: filename
+      when:
+        - master_node == inventory_hostname
+
+    - name: check if sid exist in ORATAB file
+      shell: 'grep "{{ oracle_sid }}" /etc/oratab'
+      ignore_errors: yes
+      register: check_sid_in_oratab
+
+# check if oracle sid is already in file, dont make entry if it exist already
+    - name: Creating sid entry in ORATAB file
+      lineinfile:
+        path: /etc/oratab
+        line: '{{ oracle_sid }}:{{ oracle_home }}:N    # line added by Ansible'
+      when: check_sid_in_oratab is not defined
+
+    - name: place a marker for completion
+      file:
+        path: "{{ oracle_base }}/admin/.post_provisioning_done_{{ oracle_db_name }}"
+        state: touch
+        mode: 0400
+
+    - name: db checklist status post for Post DB Provisioning
+      import_role:
+        name: dbaas_api_services
+        tasks_from: db_checklist_status.yml
+      vars:
+        task_key: "{{ oracle_db_name }}"
+        task_area: "POST PROVISION Database"
+        task_id: "{{ ticket_ref }}"
+        task_status: "SUCCESSFUL"
+        task_message: "POST PROVISIONING Database for {{ oracle_db_name }} "
+        standard_task_id: "{{ standard_task_id }}"
+      tags:
+      - apex_api
+  rescue:
+    # - name: db checklist post update for post provisioning for db
+    #   include_tasks: db_checklist_post_update.yml
+    #   vars:
+    #     chklst_json_body:
+    #       host_name: "{{ ansible_hostname }}"
+    #       db_name: "{{ oracle_db_name }}"
+    #       ticket_ref: "{{ ticket_ref }}"
+    #       checklist_type: "POST PROVISIONING for DB"
+    #       checklist_category: POST PROVISION
+    #       new_entry: True
+    #       #ID: "{{ checklist_id }}"
+    #       post_build_status: FAILED
+    #       task_desc: post provisioning
+    #   tags:
+    #   - apex_api
+
+    - name: db checklist status post for Post DB Provisioning
+      import_role:
+        name: dbaas_api_services
+        tasks_from: db_checklist_status.yml
+      vars:
+        task_key: "{{ oracle_db_name }}"
+        task_area: "POST PROVISION Database"
+        task_id: "{{ ticket_ref }}"
+        task_status: "FAILED"
+        standard_task_id: "{{ standard_task_id }}"
+        task_message: "POST PROVISIONING Database for {{ oracle_db_name }} "
+      tags:
+      - apex_api
+
+- name: get database instances
+  shell: srvctl config database -d {{ oracle_unique_name }} | grep instances | awk '{ print $3 }'
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  register: srvctl_grep_instances
+  changed_when: False
+  when: inventory_hostname == master_node
+
+- name: set flag for instances
+  set_fact:
+    oracle_service_instances: "{{ srvctl_grep_instances.stdout }}"
+  when: inventory_hostname == master_node
+
+- name: db service creation
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: >
+    srvctl add service -database {{ oracle_unique_name }} -service {{ oracle_db_name }}_svc
+    {{ '-preferred ' + oracle_service_instances if oracle_service_instances != '' else '' }}
+    -role {{ db_srv_type }}
+  register: "db_service_creation_output"
+  when: inventory_hostname == master_node
+
+- name: cgctl directory creation
+  file:
+    path: "{{oracle_base}}/admin/{{oracle_db_name}}/chgctl"
+    owner: '{{ oracle_user }}'
+    group: '{{ oracle_group }}'
+    state: directory
+    mode: 0777
+
+# - name: db checklist post update for post provisioning for db
+#   include_tasks: db_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: True
+#       host_name: "{{ ansible_hostname }}"
+#       db_name: "{{ oracle_db_name }}"
+#       ticket_ref: "{{ ticket_ref }}"
+#       checklist_type: "POST PROVISIONING for DB"
+#       checklist_category: POST PROVISION
+#       #ID: "{{ checklist_id }}"
+#       post_build_status: "SUCCESSFUL"
+#       task_desc: post provisioning
+#   tags:
+#   - apex_api

@@ -1,0 +1,25 @@
+---
+
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+# location for temporary files
+oracle_tmp: /u01/tmp/{{ oracle_version }}/GG
+
+oracle_user: oracle
+
+oracle_group: oinstall
+
+oracle_home: "{{ install_base }}/{{ oracle_version }}/grid_1"
+
+# shell environment for the oracle user
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ oracle_sid }}"
+  ORACLE_UNQNAME: "{{ oracle_db_name }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ oracle_home }}/bin:{{ ansible_env.PATH }}"
+
+gg_installer: "{{ oracle_installer_path }}/GG/{{ oracle_version }}/123014_fbo_ggs_Linux_x64_shiphome.zip"
+
+gg_install_dir: "{{ oracle_tmp }}/123014_fbo_ggs_Linux_x64_shiphome/fbo_ggs_Linux_x64_shiphome/Disk1"

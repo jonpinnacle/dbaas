@@ -1,0 +1,41 @@
+- name: install ntpd
+  yum:
+    name: ntp
+    state: present
+
+- name: stop ntpd
+  shell: systemctl stop ntpd
+  ignore_errors: True
+
+- name: check the existance of ntpd file in sysconfig
+  stat:
+    path: /etc/sysconfig/ntpd
+  register: ntpd_file
+
+- name: modify the sysconfig of ntpd
+  lineinfile:
+    path: /etc/sysconfig/ntpd
+    regexp: "OPTIONS.*"
+    line: "OPTIONS=\" -u ntp:ntp -p /var/run/ntpd.pid -g -x\""
+  when: ntpd_file.stat.exists
+
+- name: modify the sysconfig of ntpd NTPDATE_OPTIONS
+  lineinfile:
+    path: /etc/sysconfig/ntpd
+    insertafter: EOF
+    line: "NTPDATE_OPTIONS=\"\""
+  when: ntpd_file.stat.exists
+
+- name: modify the sysconfig of ntpd SYNC_HWCLOCK
+  lineinfile:
+    path: /etc/sysconfig/ntpd
+    insertafter: EOF
+    line: "SYNC_HWCLOCK=no"
+  when: ntpd_file.stat.exists
+
+
+- name: enable ntpd
+  shell: systemctl enable ntpd
+
+- name: restart ntpd
+  shell: systemctl restart ntpd

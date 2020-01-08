@@ -1,0 +1,5 @@
+---
+
+asm_disk_location: /dev/oracleasm/disks
+
+oracle_installer_path: "/ansible"

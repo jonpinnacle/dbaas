@@ -1,0 +1,130 @@
+---
+# - name: include host checklist post update for run cluvfy
+#   include_tasks: "host_checklist_post_update.yml"
+#   vars:
+#     chklst_json_body:
+#       new_entry: True
+#       ticket_ref: "{{ ticket_ref }}"
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: CLUVFY
+#       checklist_category: PRE-CHECK
+#       gi_install_status: STARTED
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for CLUVFY
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ cluster_name }}"
+    task_area: "CLUVFY"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "CLUVRY for {{ cluster_name }} - {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- name: set cvu_config settings
+  lineinfile:
+    path: "{{ oracle_tmp }}/cluster_verify/cv/admin/cvu_config"
+    regexp: "^{{ item.regex }}"
+    line: "{{ item.regex }}={{ item.value }}"
+  with_items:
+    - { regex: CV_RAW_CHECK_ENABLED, value: 'FALSE' }
+  ignore_errors: yes
+
+- name: run cluvfy
+  become: yes
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  command: "{{ oracle_tmp }}/cluster_verify/bin/cluvfy stage -pre crsinst -osdba {{ oracle_dba_group }} -orainv {{ oracle_group }} -n {{ cluster_nodes | join(',') if ',' not in cluster_nodes else cluster_nodes }} -r {{ oracle_major_version }} -verbose"
+  ignore_errors: yes
+  register: cluvfy_results
+
+- name: save cluvfy stdout
+  copy:
+    dest: "{{ oracle_tmp }}/cluvfy_stdout.out"
+    content: "{{ cluvfy_results.stdout }}"
+  changed_when: False
+
+- name: save cluvfy stderr
+  copy:
+    dest: "{{ oracle_tmp }}/cluvfy_stderr.err"
+    content: "{{ cluvfy_results.stderr }}"
+  changed_when: False
+  when: cluvfy_results.stderr_lines | length > 0
+
+- name: check known failures
+  block:
+  - name: cleanup cluvfy stdout
+    replace:
+      path: "{{ oracle_tmp }}/cluvfy_stdout.out"
+      regexp: 'FAILED'
+      replace: 'failed'
+      before: 'Failures were encountered during execution.*'
+
+  - name: ignore known cluvfy failures
+    lineinfile:
+      path: "{{ oracle_tmp }}/cluvfy_stdout.out"
+      regexp: ".*{{ item }}.*FAILED"
+      line: "{{ item }} IGNORED"
+    with_items: "{{ known_cluvfy_issues }}"
+
+  - name: Any non-ignorable failures?
+    command: "grep FAILED {{ oracle_tmp }}/cluvfy_stdout.out"
+    register: cluvfy_failures
+    changed_when: false
+    failed_when: cluvfy_failures.stdout_lines | length > 0
+    ignore_errors: yes
+  when: cluvfy_results.rc != 0
+
+# - name: upload logs for cluster verify
+#   import_tasks: upload_log.yml
+#   vars:
+#     logfile_path: "{{ oracle_tmp }}/cluvfy_stdout.out"
+#     log_file_desc: cluvfy
+#   tags:
+#   - apex_api
+
+- name: db checklist status file upload for Cluvfy
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status_file.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "CLUVFY"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload CLUFY"
+    task_message: "CLUVFY {{ cluster_name }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    logfile_path: "{{ oracle_tmp }}/cluvfy_stdout.out"
+  tags:
+  - apex_api
+
+- name: Check Cluster Verify Result
+  set_fact:
+    final_result: "{% if cluvfy_results.rc | default(1) != 0 and
+                         cluvfy_failures is failed -%}FAILED
+                   {%- else -%}SUCCESSFUL
+                   {%- endif %}"
+
+- name: db checklist status post for CLUVFY
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "CLUVFY"
+    task_id: "{{ ticket_ref }}"
+    task_status:  "{{ final_result }}"
+    task_message: "CLUVRY for {{ cluster_name }} - {{ ansible_hostname }} "
+  tags:
+  - apex_api
+
+- name: Final Result
+  debug:
+    var: final_result
+  failed_when: final_result == 'FAILED'

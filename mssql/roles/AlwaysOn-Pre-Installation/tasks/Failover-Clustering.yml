@@ -1,0 +1,70 @@
+---
+- name: add a powershell module
+  win_psmodule:
+    name: xFailOverCluster
+    state: present
+
+- name: add windows features
+  win_dsc:
+    resource_name: WindowsFeature
+    Name: "{{ item }}"
+    Ensure: Present
+  loop: "{{ required_features }}"
+
+- name: Reboot Server
+  win_reboot:
+    pre_reboot_delay: 10
+    post_reboot_delay: 0
+    test_command: whoami
+    reboot_timeout: 600
+    msg: Reboot initiated by Ansible
+    connect_timeout: 5
+
+- name: ensure registry service is running
+  win_dsc:
+    resource_name: Service
+    Name: TermService
+    StartupType: Automatic
+    State: Running
+
+- name: create windows cluster
+  win_dsc:
+    resource_name: xCluster
+    Name: "{{ win_cluster_name | default('Cluster') }}"
+    #StaticIPAddress: "{{ win_cluster_ip | default('10.10.98.61') }}"
+    DomainAdministratorCredential_username: "{{ domain_admin_username }}@{{ dns_domain_name }}"
+    DomainAdministratorCredential_password: "{{ ansible_password }}"
+  register: create_windows_cluster
+  ignore_errors: yes
+  when: inventory_hostname == master_node
+
+- name: wait for cluster
+  win_dsc:
+    resource_name: xWaitForCluster
+    Name: "{{ win_cluster_name | default('Cluster') }}"
+    RetryIntervalSec: "{{ retry_interval_sec }}"
+    RetryCount: "{{ retry_count }}"
+  when: inventory_hostname != master_node
+
+- name: join windows cluster
+  win_dsc:
+    resource_name: xCluster
+    Name: "{{ win_cluster_name | default('Cluster') }}"
+    #StaticIPAddress: "{{ win_cluster_ip | default('10.10.98.61') }}"
+    DomainAdministratorCredential_username: "{{ domain_admin_username }}@{{ dns_domain_name }}"
+    DomainAdministratorCredential_password: "{{ ansible_password }}"
+  ignore_errors: yes
+  when: inventory_hostname != master_node
+
+#- name: Open Firewall Ports
+#  win_firewall_rule:
+#    name: Open Port {{ port }}
+#    localport: "{{ port }}"
+#    action: allow
+#    direction: in
+#    protocol: tcp
+#    state: present
+#    enabled: yes
+#  loop: "{{ fw_ports }}"
+#  loop_control:
+#    loop_var: port

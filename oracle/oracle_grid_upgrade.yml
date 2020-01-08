@@ -1,0 +1,16 @@
+---
+
+- name: upgrade oracle grid infrastructure from 11g to 12c
+  hosts: '{{ host }}'
+  become: yes
+  vars:
+    grid_install_mode: UPGRADE
+  tasks:
+  - import_role:
+      name: oracle_grid_infra_install
+
+  ## Required vars:
+  # cluster_name 
+  
+  ## Optional vars:
+  # grid_version (default: 12.1.0.2)    

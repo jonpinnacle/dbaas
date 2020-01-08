@@ -1,0 +1,9 @@
+---
+- name: starting database
+  environment: "{{ ora_user_env }}"
+  command: srvctl start database -db  {{ oracle_db_name }}
+  when: inventory_hostname == master_node
+
+- name: Wait for database to stop
+  pause:
+    seconds: 90

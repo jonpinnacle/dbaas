@@ -1,0 +1,12 @@
+---
+###  patch details
+KB_article_number: KB4458871
+Patch_download_URL: https://download.microsoft.com/download/6/0/6/606B3A2E-0EAE-4DCD-930D-178686370921/SQLServer2016-KB4458871-x64.exe
+
+## function type
+action: Patch # add RemovePatch for removing the patch
+
+# ansible_user: xxxx
+# ansible_password: xxxx
+# ansible_connection: winrm
+# ansible_winrm_server_cert_validation: ignore

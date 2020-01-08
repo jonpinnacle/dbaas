@@ -1,0 +1,37 @@
+---
+
+- name: install lxml dependency
+  yum:
+    name: python-lxml
+    state: present 
+  
+- name: check if inventory.xml exist
+  stat: 
+    path: "{{ install_base }}/oraInventory/ContentsXML/inventory.xml"
+  register: is_invntry_xml_exist
+  failed_when: is_invntry_xml_exist.stat.exists == false
+  
+- name: get current oracle home locations
+  xml:
+    path: "{{ install_base }}/oraInventory/ContentsXML/inventory.xml"
+    xpath: /INVENTORY/HOME_LIST/HOME
+    content: attribute
+    attribute: LOC
+  register: ora_home_xpath
+
+- name: filter oracle home locations by version
+  set_fact:
+    ora_home_list: "{{ ora_home_xpath.matches | 
+                        selectattr('HOME.LOC', 'search', oracle_base + '/product/' + oracle_version + '/') | 
+                        sort() | 
+                        json_query('[*].HOME.LOC') | 
+                        sort() }}"
+- debug:
+    var: ora_home_list
+# - name: set next oracle home for {{ oracle_version }}
+#   set_fact:
+#     oracle_db_home: "{% if ora_home_locs | length > 0 -%}db_{{ ora_home_locs[-1] | 
+#                         regex_replace(oracle_base + '/product/' + oracle_version + '/db_([0-9]*)','\\1') | 
+#                         int + 1 }}
+#                     {%- else -%}db_1
+#                     {%- endif %}"

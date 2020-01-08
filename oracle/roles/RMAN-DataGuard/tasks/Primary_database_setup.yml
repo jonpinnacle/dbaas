@@ -1,0 +1,16 @@
+---
+- name: Create a Primary database setup
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  block:
+  - name: Copy the Primary_database_setup.sql file
+    template: 
+      src: Primary_database_setup.j2
+      dest: "{{ oracle_tmp }}/Primary_database_setup.sql"
+
+  - name: run Primary_database_setup.sql
+    command: "sqlplus / as sysdba @{{ oracle_tmp }}/Primary_database_setup.sql"
+    register: opt5
+    failed_when: '"ERROR" in opt5.stdout'
+  when: inventory_hostname == master_node

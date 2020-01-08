@@ -1,0 +1,10 @@
+---
+- lineinfile:
+    path: /etc/resolv.conf
+    state: absent
+    regexp: '8\.8\.4\.4'
+
+- lineinfile:
+    path: /etc/resolv.conf
+    state: absent
+    regexp: '8\.8\.8\.8'

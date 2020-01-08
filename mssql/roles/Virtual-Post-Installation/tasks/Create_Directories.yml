@@ -1,0 +1,121 @@
+---
+- name: Remove a folder, if present
+  win_file:
+    path: {{ BuPath }}MSSQL\Backup
+    state: absent
+
+- name: Create Directory
+  win_file:
+    path: "{{ SourceDir }}"
+    state: directory
+  loop:
+  - 'D:\Install\SQL{{ SqlVersion }}\InstallPatches'
+  - '{{ SystemPath }}MSSQL{{ ext }}.MSSQLSERVER\MSSQL\Output'
+  - '{{ SystemPath }}MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS'
+  - '{{ SystemPath }}MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Checkpoints'
+  - '{{ SystemPath }}MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Configurations'
+  - '{{ SystemPath }}MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\ErrorFiles'
+  - '{{ SystemPath }}MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Logs'
+  - '{{ SystemPath }}MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\OutPutFiles'
+  - '{{ SystemPath }}MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Packages'
+  - '{{ SystemPath }}MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Raw Files'
+  - '{{ BuPath }}Refresh'
+  - '{{ BuPath }}MSSQL\Misc'
+  - '{{ BuPath }}MSSQL\Backups\DRPrep'
+  - '{{ SystemPath }}DBA'
+  - '{{ SystemPath }}DBA\Scripts'
+  - '{{ SystemPath }}DBA\Reports'
+  - '{{ SystemPath }}DBA\OutPut'
+  loop_control:
+    loop_var: SourceDir
+
+- name: check for files
+  win_stat:
+    path: D:\ConfigurationFile.ini
+  register: file_conf
+
+- name: move file
+  win_shell: |
+    move D:\ConfigurationFile.ini 'D:\Install\SQL{{ SqlVersion }}\ConfigurationFile.ini' 
+  when: file_conf.stat.exists == true
+  ignore_errors: yes
+
+- name: check for folder
+  win_stat:
+    path: D:\Powershell
+  register: folder_conf
+
+- name: move folder
+  win_shell: |
+    move D:\Powershell\ D:\Install\ 
+  when: folder_conf.stat.exists == true 
+  ignore_errors: yes
+
+- include: move_folders.yml
+  vars:
+    folder: "{{ move_folder }}"
+  loop: "{{ msfolders }}"  
+  loop_control:
+    loop_var: move_folder
+
+
+# - name: check for files
+#   win_stat:
+#     path: 'D:\{{ folder }}'
+#   when: SqlVersion == 2012
+#   loop: 
+#   - 'SQL_Server_2012_ent_wSP3'
+#   - 'SQL_Server_2012_SP3_cu7'
+#   - 'SQL_Server_2012_dev_wSP3'
+#   - 'SQL_Server_2012_SP4'
+#   - 'SQL_Server_2012_HotFIx_4057116'
+#   loop_control:
+#     loop_var: folder
+#   register: folder_check1
+
+# - name: move file and folders
+#   win_shell: |
+#     move D:\{{ folder }}\ D:\Install\SQL{{ SqlVersion }} 
+#   when: folder_check1.stat.exists == true
+#   ignore_errors: yes
+
+# - name: check for files
+#   win_stat:
+#     path: 'D:\{{ folder }}'
+#   when: SqlVersion == 2014
+#   loop: 
+#   - 'SQL_Server_ 2014_SP2_cu4'
+#   - 'SQL_Server_2014_SP2_cu4'
+#   - 'SQL_Server_2014_SP2_CU10'
+#   - 'SQL_Server_2014_ENT_wSP2'
+#   - 'SQL_Server_2014_DEV_wSP2'
+#   loop_control:
+#     loop_var: folder
+#   register: folder_check2
+
+# - name: move file and folders
+#   win_shell: |
+#     move D:\{{ folder }}\ D:\Install\SQL{{ SqlVersion }} 
+#   when: folder_check2.stat.exists == true
+#   ignore_errors: yes
+  
+# - name: check for files
+#   win_stat:
+#     path: 'D:\{{ folder }}'
+#   when: SqlVersion == 2016
+#   loop: 
+#   - 'SQL Server 2016 SP1 CU2'
+#   - 'SQL_Server_2016_CU7'
+#   - 'SQL_Server_2016_Ent_wSP1'
+#   - 'SQL_Server_2016_Dev_wSP1'
+#   - 'SSMS 2016'
+#   loop_control:
+#     loop_var: folder
+#   register: folder_check3
+
+# - name: move file and folders
+#   win_shell: |
+#     move D:\{{ folder }}\ D:\Install\SQL{{ SqlVersion }} 
+#   when: folder_check3.stat.exists == true 
+#   ignore_errors: yes
+

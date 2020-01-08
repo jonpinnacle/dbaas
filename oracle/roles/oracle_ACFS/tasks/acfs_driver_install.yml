@@ -1,0 +1,35 @@
+---
+
+- name: Install ACFS Driver
+  environment: "{{ ora_user_env }}"
+  command: acfsroot install
+
+- name: Start ACFS Driver
+  environment: "{{ ora_user_env }}"
+  command: acfsload start
+
+- name: Wait for ACFS Driver start
+  pause:
+    seconds: 30
+
+- import_tasks: acfs_driver_check.yml
+
+- fail:
+    msg: ACFS Driver did not install
+  when: not acfsdriver_installed
+
+- name: stop CRS
+  environment: "{{ ora_user_env }}"
+  command: crsctl stop has
+
+- name: Wait for CRS to stop
+  pause:
+    seconds: 90
+
+- name: start CRS
+  environment: "{{ ora_user_env }}"
+  command: crsctl start has
+
+- name: Wait for CRS to start
+  pause:
+    seconds: 90

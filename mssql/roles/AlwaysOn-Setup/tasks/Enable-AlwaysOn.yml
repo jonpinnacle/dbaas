@@ -1,0 +1,12 @@
+---
+- name: Copy Enable-AlwaysOn
+  win_template:
+    src: Enable-AlwaysOn.j2
+    dest: c:\Ansible\Temp\Enable-AlwaysOn.ps1
+
+- name: Run Enable-AlwaysOn
+  win_shell:
+    c:\Ansible\Temp\Enable-AlwaysOn.ps1
+  register: EnableAlwaysOnchecklog
+  any_errors_fatal: true
+  failed_when: '"Failed" in EnableAlwaysOnchecklog.stdout or EnableAlwaysOnchecklog.stderr != "" '

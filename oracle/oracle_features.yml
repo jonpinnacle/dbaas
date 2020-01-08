@@ -1,0 +1,7 @@
+---
+- name: Oracle Features for Licence Management
+  hosts: '{{ host }}'
+  become: yes
+  tasks:
+    - import_role:
+        name: oracle_features

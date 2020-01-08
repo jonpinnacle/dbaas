@@ -1,0 +1,17 @@
+oracle_user: oracle
+
+oracle_group: oinstall
+
+# shell environment for the oracle user
+ora_user_env:
+  # ORACLE_SID: "{{ oracle_sid }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  PATH: "{{ oracle_home }}/bin:{{ ansible_env.PATH }}"
+  TMP: "/u01/app/oracle"
+  TMPDIR: "/u01/app/oracle"
+
+
+oracle_context: database
+
+
+ticket_ref: "21655445"

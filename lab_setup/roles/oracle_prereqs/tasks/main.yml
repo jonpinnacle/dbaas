@@ -1,0 +1,63 @@
+---
+- name: set the hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
+    
+- import_tasks: rem_entires_resolve_conf.yml
+
+- include: usergroups.yml
+
+- name: create the oracle installation path
+  file:
+    mode: 0755
+    path: "{{ oracle_base }}"
+    state: directory
+    group: "{{ oracle_groups[0].name }}"
+    owner: "{{ oracle_user.name }}"
+
+- include: packages.yml
+
+# Unsure if we will need this
+- include: ora_best_practices.yml
+
+- name: set selinux
+  selinux:
+    policy: targeted
+    state: "{{ selinux_mode }}"
+
+#*******************************************
+# THE BELOW TO BE UNCOMMENTED WHEN WE GET THE LAB ENVIRONMENT WITH ALL THE IP'S REQUIRED
+#*******************************************
+
+- include: ntpd_config.yml
+
+#--------------------------------------------
+
+- name: check whether swap space exisits (for cloud instances)
+  shell: free  | awk ' $1 == "Swap:" {print $2}'
+  register: swapsize
+
+- debug: var=swapsize.stdout
+
+- name: create swap file (for cloud instances)
+  include: swap_check.yml
+  when: swapsize.stdout | int < 200000
+
+- name: make the NoZeroConf in /etc/sysconfig/network to yes
+  lineinfile:
+    path: /etc/sysconfig/network
+    line: 'NOZEROCONF=yes'
+
+- name: "make /u01 owned by {{ oracle_user.name }}"
+  file:
+    path: /u01
+    owner: "{{ oracle_user.name }}"
+    group: "{{ oracle_user.group }}"
+
+- name: Set authorized key taken from file
+  authorized_key:
+    user: root
+    state: present
+    key: "{{ lookup('file', 'pub_key') }}"
+
+- import_tasks: Charter_checks.yml

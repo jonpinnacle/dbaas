@@ -1,0 +1,28 @@
+[GENERAL]
+RESPONSEFILE_VERSION = "12.1.0"
+OPERATION_TYPE = "createDatabase"
+[CREATEDATABASE]
+GDBNAME = "{{ oracle_db_name }}"
+DATABASECONFTYPE  = "{{ db_config_type }}"
+RACONENODESERVICENAME = 
+SID = "{{ oracle_db_name }}"
+{% if oracle_pdb_name == '' -%}
+CREATEASCONTAINERDATABASE = false
+NUMBEROFPDBS = 0
+{% else -%}
+CREATEASCONTAINERDATABASE = true
+NUMBEROFPDBS = 1
+PDBNAME = "{{ oracle_pdb_name }}"
+PDBADMINPASSWORD = "{{ oracle_pdb_passwd }}"
+{% endif %}
+NODELIST = {{ cluster_node_string | join(',') }}
+TEMPLATENAME = "charter.dbt"
+SYSPASSWORD = "{{ oracle_system_pass }}"
+SYSTEMPASSWORD = "{{ oracle_system_pass }}"
+STORAGETYPE = ASM
+DISKGROUPNAME = {{ asm_data_group }}
+RECOVERYGROUPNAME = {{ asm_reco_group }}
+CHARACTERSET = "AL32UTF8"
+MEMORYPERCENTAGE = "10"
+DATABASETYPE = "MULTIPURPOSE"
+AUTOMATICMEMORYMANAGEMENT = "FALSE"

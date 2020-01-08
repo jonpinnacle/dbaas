@@ -1,0 +1,25 @@
+$Qry = "IF NOT EXISTS (SELECT name FROM sys.indexes WHERE name = N'uxMedia_set_id' AND object_id = OBJECT_ID(N'backupset'))
+        CREATE INDEX [uxMedia_set_id] ON[dbo].[backupset]([media_set_id]) "
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "msdb" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF NOT EXISTS (SELECT name FROM sys.indexes WHERE name = N'uxRestore_history_id' AND object_id = OBJECT_ID(N'restorefile'))
+        CREATE INDEX [uxRestore_history_id] ON [dbo].[restorefile]([restore_history_id]) "
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "msdb" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF NOT EXISTS (SELECT name FROM sys.indexes WHERE name = N'uxRestore_history_id' AND object_id = OBJECT_ID(N'restorefilegroup'))
+        CREATE INDEX [uxRestore_history_id] ON [dbo].[restorefilegroup]([restore_history_id]) "
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "msdb" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF NOT EXISTS (SELECT name FROM sys.indexes WHERE name = N'IX_backupset_checkpoint_lsn_type_database_name' AND object_id = OBJECT_ID(N'backupset'))
+        CREATE INDEX [IX_backupset_checkpoint_lsn_type_database_name] ON [msdb].[dbo].[backupset] ([checkpoint_lsn], [type],[database_name]) "
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "msdb" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF NOT EXISTS (SELECT name FROM sys.indexes WHERE name = N'IX_backupset_is_damaged_type_database_name' AND object_id = OBJECT_ID(N'backupset'))
+        CREATE INDEX [IX_backupset_is_damaged_type_database_name] ON [msdb].[dbo].[backupset] ([is_damaged],[type], [database_name]) INCLUDE ([backup_finish_date])"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "msdb" -username "sa" -password {{ SaPw }}
+
+$Qry = "IF NOT EXISTS (SELECT name FROM sys.indexes WHERE name = N'IX_backupset_type' AND object_id = OBJECT_ID(N'backupset'))
+        CREATE INDEX [IX_backupset_type] ON [msdb].[dbo].[backupset] ([type]) INCLUDE ([backup_finish_date], [database_name])"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "msdb" -username "sa" -password {{ SaPw }}
+
+Sqlcmd -S {{ ansible_hostname }} -d "master" -E -x -i "D:\Install\SQL-CFG\SSISDB-Optimization.sql"

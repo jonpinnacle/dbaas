@@ -1,0 +1,35 @@
+---
+- name: Insert {{ oracle_db_name }} features into DB V_PROCESS_STATUS
+  block:
+  #  "app_id" is a fk and needs to discussed and is not in body of post call
+  - name: POST In features V_PROCESS_STATUS
+    uri:
+      url:  "{{ apex_url }}/{{ apex_uri }}/send_process_status"
+      validate_certs: no  # should be removed after https certs becomes renewed
+      method: POST
+      body_format: json
+      body: "{{ db_features_body[:-1] }}"
+      headers:
+        Content-Type: "application/json"
+        Cache-Control: "no-cache"
+        record_type: "load_json"
+        task_area: "task_area"
+        task_id: "task_id"
+        task_key: "task_key"
+        task_status: "task_status"
+        task_message: "task_message"
+    register: v_db_features_response
+  
+  - name: set db_id
+    set_fact:
+      #db_id: "{{ v_db_inventory_insertion_response.json | default('{`items`:[{`ID`:``}]}') | json_query('ID') }}"
+      db_id: "{{ v_db_features_response.json.ID }}"
+  rescue:
+  - name: Store the Json If APEX Server Is Down
+    delegate_to: localhost
+    lineinfile:
+      path: "{{ json_backup_dir }}/{{ oracle_db_name }}_db_features.json"
+      line: "{{ db_features_body  | to_json }}"
+      create: yes
+    when: 
+    - v_db_features_response == "500" or  v_db_features_response.status == -1

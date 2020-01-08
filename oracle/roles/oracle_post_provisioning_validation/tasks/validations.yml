@@ -1,0 +1,663 @@
+---
+- name: host checklist post update for post provisioning validation
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Oracle Post Validation"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "Post Validations for Provisioning on {{ ansible_hostname }}"
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- name: check oracle user
+  user:
+    name: oracle
+    state: present
+  check_mode: yes
+  changed_when: False
+  register: oracle_user_check
+  when: oracle_context_grid
+
+- name: check oracle groups
+  group:
+    name: "{{ group_name }}"
+    state: present
+  check_mode: yes
+  changed_when: False
+  register: oracle_groups
+  loop:
+  - oinstall
+  - dba
+  loop_control:
+    loop_var: group_name
+  when: oracle_context_grid
+
+- name: task only for grid
+  block:
+    - name: check for content of clean up asm file
+      shell: "cat {{ oracle_base }}/admin/ctl/cleanup_files.ctl | grep +ASM"
+      register: asm_status_cleanup
+      ignore_errors: yes
+      no_log: True
+
+    - name: set asm_status_cleanup_status for stdout
+      set_fact:
+        asm_status_cleanup_status: "{{ asm_status_cleanup.stdout }}"
+      when: asm_status_cleanup.stdout != ""
+
+    - name: set asm_status_cleanup_status for stderr
+      set_fact:
+        asm_status_cleanup_status: "{{ asm_status_cleanup.stderr }}"
+      when: asm_status_cleanup.stderr != ""
+
+    - name: check for content of oratab file
+      shell: "cat /etc/oratab | grep no_sid"
+      register: nosid_status
+      ignore_errors: yes
+      no_log: True
+
+    - name: set nosid_status for stdout
+      set_fact:
+        nosid_oratab_status: "{{ nosid_status.stdout }}"
+      when: nosid_status.stdout != ""
+
+    - name: set nosid_status for stderr
+      set_fact:
+        nosid_oratab_status: "Not able to find entry in oratab file"
+      when: nosid_status.stderr == "" and nosid_status.stdout == ""
+
+    - name: Get The Huge Page Total Size
+      shell: grep HugePages /proc/meminfo | awk ' $1 == "HugePages_Total:" {print $2}'
+      changed_when: False
+      register: huge_page_total_size
+
+    - name : check for scripts/logs/ctl directory structure exist
+      stat:
+        path: "{{ oracle_base }}/admin/ctl"
+      register: ctl_file_status
+
+    - name: Store the value of directory structure
+      set_fact:
+        ctl_file_exist: "The directory exist at {{ oracle_base }}/admin/ctl"
+      when: ctl_file_status.stat.exists == true and ctl_file_status.stat.isdir == true
+
+    - name: Store the value of directory structure if not available
+      set_fact:
+        ctl_file_exist: "The directory does not exist at {{ oracle_base }}/admin/ctl"
+      when: ctl_file_status.stat.exists == false
+
+    - name: check for the .profile file in oracle home
+      shell: "ls -a $HOME | grep .profile"
+      register: profile_status
+      ignore_errors: yes
+      no_log: True
+
+    - name: set profile status for stdout
+      set_fact:
+        profile_status_check: "{{ profile_status.stdout }}"
+      when: profile_status.stdout != ""
+
+    - name: set profile_status for stderr
+      set_fact:
+        profile_status_check: "{{ profile_status.stderr }}"
+      when: profile_status.stderr != ""
+
+    - name: check for the setdb file in oracle home
+      shell: "ls $HOME | grep SetDB.sh"
+      register: setdb_file
+      ignore_errors: yes
+      no_log: True
+
+    - name: set setdb file status for stdout
+      set_fact:
+        setdb_file_status: "{{ setdb_file.stdout }}"
+      when: setdb_file.stdout != ""
+
+    - name: set setdb file status for stderr
+      set_fact:
+        setdb_file_status: "{{ setdb_file.stderr }}"
+      when: setdb_file.stderr != ""
+
+    - name: set setdb file status for stderr and stdout
+      set_fact:
+        setdb_file_status: "File not found"
+      when: setdb_file.stderr == "" and setdb_file.stdout == ""
+
+    - name: check for adrci in adrci_setup.out file
+      shell: grep adrci {{ oracle_tmp }}/adrci_setup.out
+      register: adrci_status
+      ignore_errors: yes
+      no_log: True
+
+    - name: set adrci_status for stdout
+      set_fact:
+        adrci_status_check: "{{ adrci_status.stdout }}"
+      when: adrci_status.stdout != ""
+
+    - name: set adrci_status for stderr
+      set_fact:
+        adrci_status_check: "{{ adrci_status.stderr }}"
+      when: adrci_status.stderr != [""]
+
+    - name: Check for  permissions of /u01
+      shell: ls -l / | grep u01 | awk '{print $1;}'
+      register: u01_permissions
+      ignore_errors: yes
+      no_log: True
+  when: oracle_context_grid
+
+- name: task only for database
+  block:
+    - name: execute tablespace_size sql file
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME  / as sysdba @{{ sql_file_path }}/verify_tablespace.sql
+      register: tablespace_names_result
+      changed_when: false
+
+    - name: execute verify alter sql script
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_alter_profile.sql
+      register: verify_alter_profile_result
+      changed_when: false
+
+    - name: execute verify created profile sql script
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_created_profile.sql
+      register: verify_created_profile_result
+      changed_when: false
+
+    - name: execute sql script to verify snapshot interval
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_snapshot_interval.sql
+      register: verify_snapshot_interval_result
+      changed_when: false
+
+    - name: execute sql script to verify parallel force
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_parallel_force.sql
+      register: verify_parallel_force_result
+      changed_when: false
+
+    - name: execute sql script to verify recyclebin force
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_recyclebin_status.sql
+      register: verify_recyclebin_status_result
+      changed_when: false
+
+    - name: execute sql script to modify block tracking
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_block_tracking.sql
+      register: verify_block_tracking_result
+      changed_when: false
+
+    - name: execute sql script to verify db files
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_db_files.sql
+      register: verify_db_files_result
+      changed_when: false
+
+    - name: execute sql script to verify redo logs
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_redo_logs.sql
+      register: verify_redo_logs_result
+      changed_when: false
+
+    - name: execute sql script to verify redo logs
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_redo_logs.sql
+      register: verify_redo_logs_result
+      changed_when: false
+
+    - name: execute sql script to verify dba directories
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_dba_directories.sql
+      register: verify_dba_directories_result
+      changed_when: false
+
+    - name: run post_check_audit_purge.sql script
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/post_check_audit_purge.sql"
+      register: post_check_audit_purge_result
+      failed_when: '"ERROR" in post_check_audit_purge_result.stdout'
+
+    - name: run Password_Verification_function.sql script
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/Password_Verification_function.sql"
+      register: Password_Verification_function_result
+      failed_when: '"ORA-" in Password_Verification_function_result.stdout'
+
+    - name: run archive log mod script
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/archive_log_mode.sql"
+      register: archive_log_mode_result
+
+    - name: check for database service running status
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_database_service.sql"
+      register: verify_database_service_status
+
+    - name: check for content of clean up file
+      command: "grep {{ oracle_db_name }} {{ oracle_base }}/admin/ctl/cleanup_files.ctl"
+      register: oracle_db_name_entry
+      ignore_errors: yes
+
+    - name: set oracle_db_name_entry_status for stdout
+      set_fact:
+        oracle_db_name_entry_status: "{{ oracle_db_name_entry.stdout }}"
+      when: oracle_db_name_entry.stdout != ""
+
+    - name: set oracle_db_name_entry_status for stderr
+      set_fact:
+        oracle_db_name_entry_status: "{{ oracle_db_name_entry.stderr }}"
+      when: oracle_db_name_entry.stderr != [""]
+
+    - name: check for memory status of SGA/PGA, shared_pool, db_cache_size, large_pool_size, streams_pool_size
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ sql_file_path }}/verify_memory_values.sql"
+      register: verify_memory_status
+      changed_when: false
+
+    - name: check for database name in adrci_setup.out file
+      shell: grep {{ oracle_db_name }} {{ oracle_tmp }}/adrci_setup.out
+      register: adrci_status_database
+      ignore_errors: yes
+      no_log: True
+
+    - name: set adrci_status for stdout
+      set_fact:
+        adrci_status_database_check: "{{ adrci_status_database.stdout }}"
+      when: adrci_status_database.stdout != ""
+
+    - name: set adrci_status for stderr
+      set_fact:
+        adrci_status_database_check: "{{ adrci_status_database.stderr }}"
+      when: adrci_status_database.stderr != [""]
+
+  when: oracle_context_database
+
+- set_fact:
+    exp_disk_size: "{% if ansible_mounts | json_query('[?mount == `/u01/app/oracle/exp`]') == [] -%}unmounted
+                    {%- else -%}{{ ansible_mounts | json_query('[?mount == `/u01/app/oracle/exp`].size_total|[0]') }}
+                    {%- endif -%}"
+  when: oracle_context_grid
+
+- set_fact:
+    ggs_disk_size: "{% if ansible_mounts | json_query('[?mount == `/u01/app/oracle/ggs`]') == [] -%}unmounted
+                    {%- else -%}{{ ansible_mounts | json_query('[?mount == `/u01/app/oracle/ggs`].size_total|[0]') }}
+                    {%- endif -%}"
+  when: golden_gate_check
+
+- set_fact:
+    checklist:
+    - name: oracle user
+      expected_value: "900"
+      actual_value: "{{ oracle_user_check.uid }}"
+      status: "{% if oracle_user_check.uid != 900 -%}FAILED
+                {%- else -%}PASSED
+                {%- endif %}"
+
+    - name: oracle groups
+      expected_value: 9000, 9001
+      actual_value: "{{ oracle_groups | json_query('results[?name == `oinstall`] | [0].gid') }},
+                      {{ oracle_groups | json_query('results[?name == `dba`] | [0].gid') }}"
+      status: "{% if oracle_groups | json_query('results[?name == `oinstall`] | [0].gid') == 9000 or
+                      oracle_groups | json_query('results[?name == `dba`] | [0].gid') == 9001 or
+                      oracle_groups | json_query('results[?name == `oinstall`] | [0].gid') == 9001 or
+                      oracle_groups | json_query('results[?name == `dba`] | [0].gid') == 9000 -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: check adrci file status
+      expected_value: "adrci in adrci_setup.out file should exist"
+      actual_value: "{{ adrci_status_check }}"
+      status: '{% if adrci_status.stdout_lines != [""] -%}FAILED
+               {%- else -%}PASSED
+               {%- endif -%}'
+
+    - name: check for asm in clean up files
+      expected_value: "asm should existing in clean up files "
+      actual_value: "{{ asm_status_cleanup_status }}"
+      status: "{% if asm_status_cleanup.stdout != '' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: check for nosid in oratab files
+      expected_value: "nosid should exist in oratab file"
+      actual_value: "{{ nosid_oratab_status }}"
+      status: "{% if nosid_status.stdout != '' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: check for ctl file directory structure
+      expected_value: "The directory exist at {{ oracle_base }}/admin/ctl"
+      actual_value: "{{ ctl_file_exist }}"
+      status: "{% if ctl_file_status.stat.exists == true and ctl_file_status.stat.isdir == true -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: check for .profile file in oracle home
+      expected_value: "The .profile file should exist in specific directory"
+      actual_value: "{{ profile_status_check }}"
+      status: "{% if profile_status.stdout != '' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: check for Setdb.sh file in oracle home
+      expected_value: "The Setdb.sh file should exist in specific directory"
+      actual_value: "{{ setdb_file_status }}"
+      status: "{% if setdb_file.stdout != '' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - check_name: HugePages Total Size
+      expected_value: "{{ ansible_memtotal_mb // 2 }}"
+      actual_value: "{{ huge_page_total_size.stdout | int * 2 }}"
+      status: "{% if huge_page_total_size.stdout | int * 2 < ansible_memtotal_mb // 2 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+
+    - name: EXP Mount (in GiB)
+      expected_value: 295
+      actual_value: "{{ (exp_disk_size | int / 1024 | pow(3)) | round | int }}"
+      status: "{% if exp_disk_size == 'unmounted' or
+                  (exp_disk_size | int / 1024 | pow(3)) | round | int < 295 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif -%}"
+
+    - name: check file permissions of /u01
+      expected_value: ""
+      actual_value: "{{ u01_permissions.stdout }}"
+      status: ''
+
+    - name: GG Mount (in GiB)
+      expected_value: "{% if golden_gate_check -%}300
+                       {%- else -%}
+                       {%- endif -%}"
+      actual_value: "{% if golden_gate_check -%}{{ (ggs_disk_size | int / 1024 | pow(3)) | round | int }}
+                       {%- else -%}
+                       {%- endif -%}"
+      status: "{% if not golden_gate_check -%}NOT_CHECKED
+               {%- elif ggs_disk_size == 'unmounted' or
+                       (ggs_disk_size | int / 1024 | pow(3)) | round | int < 300 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif -%}"
+  when: oracle_context_grid
+
+- set_fact:
+    checklist:
+    - name: results of validation done using sql queries
+      expected_value: ""
+      actual_value:
+          - check_type: "tablespace name and size"
+            value: "{{ tablespace_names_result.stdout_lines | default('')}}"
+          - check_type: "alter profile"
+            value: "{{ verify_alter_profile_result.stdout_lines | default('')}}"
+          - check_type: "created profile"
+            value: "{{ verify_created_profile_result.stdout_lines | default('') }}"
+          - check_type: "snapshot interval"
+            value: "{{ verify_snapshot_interval_result.stdout_lines | default('')}}"
+          - check_type: "verify parallel force"
+            value: "{{ verify_parallel_force_result.stdout_lines | default('')}}"
+          - check_type: "verify recycle bin status"
+            value: "{{ verify_recyclebin_status_result.stdout_lines | default('')}}"
+          - check_type: "verify block tracking"
+            value: "{{ verify_block_tracking_result.stdout_lines | default('')}}"
+          - check_type: "verify db files"
+            value: "{{ verify_db_files_result.stdout_lines | default('')}}"
+          - check_type: "verify redo logs"
+            value: "{{ verify_redo_logs_result.stdout_lines | default('') }}"
+          - check_type: "verify dba directories"
+            value: "{{ verify_dba_directories_result.stdout_lines | default('') }}"
+          - check_type: "post check audit purge result"
+            value: "{{ post_check_audit_purge_result.stdout_lines | default('') }}"
+          - check_type: "Password Verification function result"
+            value: "{{ Password_Verification_function_result.stdout_lines | default('') }}"
+          - check_type: "archive log mode result"
+            value: "{{ archive_log_mode_result.stdout_lines | default('') }}"
+          - check_type: "verify database service status"
+            value: "{{ verify_database_service_status.stdout_lines | default('') }}"
+          - check_type: "check for database name in adrci output"
+            value: "{{ adrci_status_database_check }}"
+          - check_type: "database name clean up file status"
+            value: "{{ oracle_db_name_entry_status }}"
+          - check_type: "verify memory status"
+            value: "{{ verify_memory_status.stdout_lines | default('') }}"
+      status: ""
+  when: oracle_context_database
+
+- set_fact:
+    checklist:
+    - name: oracle user
+      expected_value: "900"
+      actual_value: "{{ oracle_user_check.uid }}"
+      status: "{% if oracle_user_check.uid != 900 -%}FAILED
+                {%- else -%}PASSED
+                {%- endif %}"
+
+    - name: oracle groups
+      expected_value: 9000, 9001
+      actual_value: "{{ oracle_groups | json_query('results[?name == `oinstall`] | [0].gid') }},
+                      {{ oracle_groups | json_query('results[?name == `dba`] | [0].gid') }}"
+      status: "{% if oracle_groups | json_query('results[?name == `oinstall`] | [0].gid') == 9000 or
+                      oracle_groups | json_query('results[?name == `dba`] | [0].gid') == 9001 or
+                      oracle_groups | json_query('results[?name == `oinstall`] | [0].gid') == 9001 or
+                      oracle_groups | json_query('results[?name == `dba`] | [0].gid') == 9000 -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: check adrci file status
+      expected_value: "adrci in adrci_setup.out file should exist"
+      actual_value: "{{ adrci_status_check }}"
+      status: '{% if adrci_status.stdout_lines != [""] -%}FAILED
+               {%- else -%}PASSED
+               {%- endif -%}'
+
+    - name: check for asm in clean up files
+      expected_value: "asm should existing in clean up files "
+      actual_value: "{{ asm_status_cleanup_status }}"
+      status: "{% if asm_status_cleanup.stdout != '' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: check for nosid in oratab files
+      expected_value: "nosid should exist in oratab file"
+      actual_value: "{{ nosid_oratab_status }}"
+      status: "{% if nosid_status.stdout != '' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: check for ctl file directory structure
+      expected_value: "The directory exist at {{ oracle_base }}/admin/ctl"
+      actual_value: "{{ ctl_file_exist }}"
+      status: "{% if ctl_file_status.stat.exists == true and ctl_file_status.stat.isdir == true -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+    - name: check for .profile file in oracle home
+      expected_value: "The .profile file should exist in specific directory"
+      actual_value: "{{ profile_status_check }}"
+      status: "{% if profile_status.stdout != '' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: check for Setdb.sh file in oracle home
+      expected_value: "The Setdb.sh file should exist in specific directory"
+      actual_value: "{{ setdb_file_status }}"
+      status: "{% if setdb_file.stdout != '' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - check_name: HugePages Total Size
+      expected_value: "{{ ansible_memtotal_mb // 2 }}"
+      actual_value: "{{ huge_page_total_size.stdout | int * 2 }}"
+      status: "{% if huge_page_total_size.stdout | int * 2 < ansible_memtotal_mb // 2 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+
+    - name: EXP Mount (in GiB)
+      expected_value: 295
+      actual_value: "{{ (exp_disk_size | int / 1024 | pow(3)) | round | int }}"
+      status: "{% if exp_disk_size == 'unmounted' or
+                  (exp_disk_size | int / 1024 | pow(3)) | round | int < 295 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif -%}"
+    - name: GG Mount (in GiB)
+      expected_value: "{% if golden_gate_check -%}300
+                       {%- else -%}
+                       {%- endif -%}"
+      actual_value: "{% if golden_gate_check -%}{{ (ggs_disk_size | int / 1024 | pow(3)) | round | int }}
+                       {%- else -%}
+                       {%- endif -%}"
+      status: "{% if not golden_gate_check -%}NOT_CHECKED
+               {%- elif ggs_disk_size == 'unmounted' or
+                       (ggs_disk_size | int / 1024 | pow(3)) | round | int < 300 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif -%}"
+    - name: results of validation done using sql queries
+      expected_value: ""
+      actual_value:
+          - check_type: "tablespace name and size"
+            value: "{{ tablespace_names_result.stdout_lines | default('')}}"
+          - check_type: "alter profile"
+            value: "{{ verify_alter_profile_result.stdout_lines | default('')}}"
+          - check_type: "created profile"
+            value: "{{ verify_created_profile_result.stdout_lines | default('') }}"
+          - check_type: "snapshot interval"
+            value: "{{ verify_snapshot_interval_result.stdout_lines | default('')}}"
+          - check_type: "verify parallel force"
+            value: "{{ verify_parallel_force_result.stdout_lines | default('')}}"
+          - check_type: "verify recycle bin status"
+            value: "{{ verify_recyclebin_status_result.stdout_lines | default('')}}"
+          - check_type: "verify block tracking"
+            value: "{{ verify_block_tracking_result.stdout_lines | default('')}}"
+          - check_type: "verify db files"
+            value: "{{ verify_db_files_result.stdout_lines | default('')}}"
+          - check_type: "verify redo logs"
+            value: "{{ verify_redo_logs_result.stdout_lines | default('') }}"
+          - check_type: "verify dba directories"
+            value: "{{ verify_dba_directories_result.stdout_lines | default('') }}"
+          - check_type: "post check audit purge result"
+            value: "{{ post_check_audit_purge_result.stdout_lines | default('') }}"
+          - check_type: "Password Verification function result"
+            value: "{{ Password_Verification_function_result.stdout_lines | default('') }}"
+          - check_type: "archive log mode result"
+            value: "{{ archive_log_mode_result.stdout_lines | default('') }}"
+          - check_type: "verify database service status"
+            value: "{{ verify_database_service_status.stdout_lines | default('') }}"
+          - check_type: "check for database name in adrci output"
+            value: "{{ adrci_status_database_check }}"
+          - check_type: "database name clean up file status"
+            value: "{{ oracle_db_name_entry_status }}"
+          - check_type: "verify memory status"
+            value: "{{ verify_memory_status.stdout_lines | default('') }}"
+      status: ""
+  when: oracle_context_database == "True" and oracle_context_grid == "True"
+
+-  debug:
+    var: checklist
+
+- name: store the result in a json
+  copy:
+    dest: "{% if oracle_context_grid -%}{{ oracle_tmp }}/grid_post_validaton_result.json
+              {%- elif oracle_context_database -%}{{ oracle_tmp }}/{{ oracle_db_name }}_post_validaton_result.json
+              {%- elif oracle_context_database and oracle_context_grid -%}{{ oracle_tmp }}/combined_post_validaton_result.json
+              {%- endif %}"
+    content: "{{ checklist }}"
+
+- name: Create json template for verify result
+  template:
+    src: post_validaton_result_list.json.j2
+    dest: "{{ oracle_tmp }}/{{ oracle_db_name }}_post_validaton_result_list.json"
+
+- name: db checklist status file upload for postchecks Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status_file.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Post Validation"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload postcheck json"
+    task_message: "Postcheck json {{ ansible_hostname }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    logfile_path: "{% if oracle_context_grid -%}{{ oracle_tmp }}/grid_post_validaton_result.json
+              {%- elif oracle_context_database -%}{{ oracle_tmp }}/{{ oracle_db_name }}_post_validaton_result.json
+              {%- elif oracle_context_database -%}{{ oracle_tmp }}/combined_post_validaton_result.json
+              {%- endif %}"
+    standard_task_id: "{{ standard_task_id_val }}"
+  tags:
+  - apex_api
+
+- name: host checklist post update for post provisioning validation
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Post Validation"
+    task_id: "{{ ticket_ref }}"
+    task_status: "FAILED"
+    task_message: "Post Validations for Provisioning on {{ ansible_hostname }}"
+    standard_task_id: "{{ standard_task_id }}"
+  when: checklist | json_query('[?status == `FAILED`]') | length > 1
+  tags:
+  - apex_api
+
+- name: host checklist post update for post provisioning validation
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Oracle Post Validation"
+    task_id: "{{ ticket_ref }}"
+    task_status: "SUCCESSFUL"
+    task_message: "Post Validations for Provisioning on {{ ansible_hostname }}"
+    standard_task_id: "{{ standard_task_id }}"
+  when: checklist | json_query('[?status == `FAILED`]') | length == 0
+  tags:
+  - apex_api
+
+- name: Check for Post validation Failures
+  fail:
+    msg: "{% if checklist | json_query('[?status == `FAILED`]') | length == 1 -%}You have 1 failed check
+          {%- else -%}You have {{ checklist | json_query('[?status == `FAILED`]') | length }} failed checks
+          {%- endif %}"
+  when: checklist | json_query('[?status == `FAILED`]') | length > 1
+  tags: postval_fail

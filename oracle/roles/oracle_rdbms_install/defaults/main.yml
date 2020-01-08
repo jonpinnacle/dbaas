@@ -1,0 +1,40 @@
+---
+
+oracle_version: 12.1.0.2
+
+# Oracle Editions avaialble: EE, SEONE, SE
+oracle_edition: EE
+
+# location for temporary installation files
+oracle_tmp: /u01/tmp/{{ oracle_version }}
+
+install_base: /u01/app
+
+oracle_base: "{{ install_base }}/oracle"
+
+oracle_db_name: ''
+
+
+oracle_db_mem: "2048"
+
+# FILE_SYSTEM_STORAGE | ASM_STORAGE
+oracle_storage_type: ASM_STORAGE
+
+asm_data_group: DATA
+
+rac_install: "{% if ansible_play_hosts | length > 1 -%}true
+              {%- else -%}false
+              {%- endif %}"
+
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB
+
+oracle_images:
+- linuxamd64_12102_database_1of2.zip
+- linuxamd64_12102_database_2of2.zip
+
+# Whether to start Oracle Enterprise Manager DBconsole
+oracle_em: false
+first_run: False
+fresh_install: False
+
+standard_task_id: "0"

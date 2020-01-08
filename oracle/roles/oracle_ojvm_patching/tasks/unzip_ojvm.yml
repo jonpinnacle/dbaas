@@ -1,0 +1,35 @@
+- name: create tmp dir to unzip the patch
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}"
+    state: directory
+    recurse: yes
+  register: tmp_dir_creation
+
+- name: create the path to store the patch files
+  file:
+    path: "{{ oracle_installer_path }}/PSU-RU/{{ grid_version }}/{{ patch_quarter }}_{{ patch_year }}"
+    state: directory
+    recurse: yes
+
+- name: "get {{ ojvm_patch }} from S3"
+  aws_s3:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    bucket: gfcloudsoftwarerepo
+    object: "ORACLE_DB/OPATCH/{{ ojvm_patch }}"
+    dest: "{{ oracle_installer_path }}/PSU-RU/{{ grid_version }}/{{ patch_quarter }}_{{ patch_year }}/{{ ojvm_patch }}"
+    mode: get
+
+- name: unzip ojvm patch
+  unarchive: 
+    src: "{{ oracle_installer_path }}/PSU-RU/{{ grid_version }}/{{ patch_quarter }}_{{ patch_year }}/{{ ojvm_patch }}" 
+    dest: "{{ oracle_tmp }}" 
+    remote_src: yes 
+    keep_newer: true
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0755
+    validate_certs: no
+  when: tmp_dir_creation.changed

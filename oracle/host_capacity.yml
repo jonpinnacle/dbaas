@@ -1,0 +1,18 @@
+---
+
+- name: host capacity
+  hosts: '{{ host }}'
+  become: yes
+  gather_facts: yes
+  tasks:
+  - import_role:
+      name: oracle_api_services
+      tasks_from: host_capacity_insertion
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_rec_type: "LOAD_JSON"
+      task_area: "HOST_CAPACITY"
+      task_id: "{{ ticket_ref }}"
+      task_status: "SUCCESS"
+      task_message: "{{ ansible_mounts }}"
+      standard_task_id: "{{ standard_task_id }}"     

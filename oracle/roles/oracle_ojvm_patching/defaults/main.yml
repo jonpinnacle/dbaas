@@ -1,0 +1,26 @@
+oracle_version: 12.1.0.2
+
+grid_version: 12.1.0.2
+
+install_base: /u01/app
+
+oracle_base: "{{ install_base }}/oracle"
+
+oracle_tmp: /u01/tmp/ojvm_patch
+
+oracle_db_name: +ASM
+
+oracle_user: oracle
+
+oracle_group: oinstall
+
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+db_list: []
+
+db_name_list: []
+
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB
+# vars to be taken care
+# ojvm_patch - Patch filename
+standard_task_id: "0"  

@@ -1,0 +1,19 @@
+---
+
+grid_version: 12.1.0.2
+
+# location for temporary installation files
+oracle_tmp: /u01/tmp/{{ grid_version }}
+
+install_base: /u01/app
+
+oracle_base: "{{ install_base }}/oracle"
+
+oracle_db_name: +ASM
+
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB
+
+standard_task_id: "0"
+known_cluvfy_issues:
+  - "Group Existence: asmadmin"
+  - "Group Membership: asmadmin"

@@ -1,0 +1,74 @@
+---
+- name: Create a new block volume
+  oci_volume:
+    api_user: "{{ oci_user }}"
+    api_user_fingerprint: "{{ oci_user_fingerprint }}"
+    api_user_key_file: "{{ oci_user_key_file }}"
+    availability_domain: "{{ oci_region }}"
+    region: "{{ oci_location }}"
+    tenancy: "{{ oci_compartment_id }}"
+    compartment_id: "{{ oci_compartment_id }}"
+    size_in_gbs: "{{ item.size }}"
+    name: "{{ inventory_hostname }}_{{ item.name }}"
+  register: volume_result
+  loop: "{{ oci_disks }}"
+
+- set_fact:
+    volume_id: "{{ volume_result | json_query('results[*].volume.id') }}"
+
+- name: create the instance
+  oci_instance:
+    api_user: "{{ oci_user }}"
+    api_user_fingerprint: "{{ oci_user_fingerprint }}"
+    api_user_key_file: "{{ oci_user_key_file }}"
+    #api_user_key_pass_phrase:
+    name: "{{ inventory_hostname }}"
+    availability_domain: "{{ oci_region }}"
+    region: "{{ oci_location }}"
+    tenancy: "{{ oci_compartment_id }}"
+    compartment_id: "{{ oci_compartment_id }}"
+    source_details:
+       source_type: image
+       image_id: "{{ oci_image_id }}"
+    shape: "{{ oci_shape }}"
+    vnic:
+      assign_public_ip: True
+      hostname_label: "{{ inventory_hostname }}"
+      subnet_id: "{{ oci_subnet_id }}"
+    metadata:
+      ssh_authorized_keys: "{{ lookup('file', 'gf_keys_pub' ) }}"
+  register: oci_instance_result
+
+- name: attach the volume to the instance
+  oci_volume_attachment:
+    api_user: "{{ oci_user }}"
+    api_user_fingerprint: "{{ oci_user_fingerprint }}"
+    api_user_key_file: "{{ oci_user_key_file }}"
+    region: "{{ oci_location }}"
+    tenancy: "{{ oci_compartment_id }}"
+    instance_id: "{{ oci_instance_result.instance.id }}"
+    type: "paravirtualized"
+    volume_id: "{{ item }}"
+  register: attach_result
+  loop: "{{ volume_result | json_query('results[*].volume.id') }}"
+
+- name: show instance results
+  debug:
+    msg: "{{ inventory_hostname }} \n
+          {{ oci_instance_result.instance.primary_private_ip }} \n
+          {{ oci_instance_result.instance.primary_public_ip }} \n
+          {{ oci_instance_result.instance.id }}"
+
+- name: Add tower host
+  tower_host:
+    tower_host: "{{ awx_uri }}"
+    tower_username: "{{ awx_vm_user }}"
+    tower_password: "{{ tower_pass }}"
+    name: "{{ inventory_hostname }}"
+    description: "{{ inventory_hostname }}"
+    inventory: "Integration-INV"
+    state: present
+    variables:
+      ansible_host: "{{ oci_instance_result.instance.primary_public_ip }}"
+      oci_id: "{{ oci_instance_result.instance.id}}"
+      ansible_user: opc

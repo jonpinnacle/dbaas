@@ -1,0 +1,73 @@
+---
+- name: create the instance
+  oci_instance:
+    api_user: "{{ oci_user }}"
+    api_user_fingerprint: "{{ oci_user_fingerprint }}"
+    api_user_key_file: "{{ oci_user_key_file }}"
+    #api_user_key_pass_phrase:
+    name: "{{ inventory_hostname }}"
+    availability_domain: "{{ oci_region }}"
+    region: "{{ oci_location }}"
+    tenancy: "{{ oci_compartment_id }}"
+    compartment_id: "{{ oci_compartment_id }}"
+    source_details:
+       source_type: image
+       image_id: "{{ oci_image_id }}"
+    shape: "{{ oci_shape }}"
+    vnic:
+      assign_public_ip: True
+      hostname_label: "{{ inventory_hostname }}"
+      subnet_id: "{{ oci_subnet_id }}"
+    metadata:
+      ssh_authorized_keys: "{{ lookup('file', 'gf_lab.pub' ) }}"
+  register: oci_instance_result
+
+- name: show instance results
+  debug:
+    msg: "{{ inventory_hostname }} \n
+          {{ oci_instance_result.instance.primary_private_ip }} \n
+          {{ oci_instance_result.instance.primary_public_ip }} \n
+          {{ oci_instance_result.instance.id }}"
+
+- name: Add tower host
+  tower_host:
+    tower_host: "{{ awx_uri }}"
+    tower_username: "{{ awx_vm_user }}"
+    tower_password: "{{ tower_pass }}"
+    tower_verify_ssl: no
+    name: "{{ inventory_hostname }}"
+    description: "{{ inventory_hostname }}"
+    inventory: "Integration-INV"
+    state: present
+    variables:
+      ansible_host: "{{ oci_instance_result.instance.primary_public_ip }}"
+      mongo_ip: "{{ oci_instance_result.instance.primary_private_ip }}"
+      oci_id: "{{ oci_instance_result.instance.id }}"
+      ansible_user: opc
+  vars:
+    interim_string: "{% for item in group_names %}{{ item | upper }},{% endfor %}"
+    result_list: "{{ interim_string.split(',') }}"
+  when:
+    - "'MONGO_SHARD' not in result_list"
+
+- name: Add tower host
+  tower_host:
+    tower_host: "{{ awx_uri }}"
+    tower_username: "{{ awx_vm_user }}"
+    tower_password: "{{ tower_pass }}"
+    tower_verify_ssl: no
+    name: "{{ inventory_hostname }}"
+    description: "{{ inventory_hostname }}"
+    inventory: "Integration-INV"
+    state: present
+    variables:
+      ansible_host: "{{ oci_instance_result.instance.primary_public_ip }}"
+      mongo_ip: "{{ oci_instance_result.instance.primary_private_ip }}"
+      oci_id: "{{ oci_instance_result.instance.id }}"
+      mongo_rep: "01"
+      ansible_user: opc
+  vars:
+    interim_string: "{% for item in group_names %}{{ item | upper }},{% endfor %}"
+    result_list: "{{ interim_string.split(',') }}"
+  when:
+    - "'MONGO_SHARD' in result_list"

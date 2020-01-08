@@ -1,0 +1,78 @@
+---
+- include_vars: secrets.yml
+  no_log: True
+
+- name: get oracle grid home
+  shell: "ps -ef | grep ohasd | grep {{ install_base }}/{{ grid_version }}/ |  grep -v grep | awk -F ' ' '{ print $8 }'"
+  changed_when: False
+  register: oracle_ohasd_process
+
+- name: set grid home
+  set_fact:
+    oracle_grid_home: "{{ oracle_ohasd_process.stdout | regex_replace('/bin/ohasd.bin', '') }}"
+
+- name: get db details
+  command: grep "^{{ oracle_db_name }}:" /etc/oratab
+  register: db_details
+  changed_when: False
+
+- name: set oracle_home
+  set_fact:
+    oracle_home: "{{ db_details.stdout | regex_replace('^[^:]*:([^:]*).*', '\\1') }}"
+
+- name: Check the LOG_MODE
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  block:
+  - name: Copy the check_logmode.sql file
+    copy: 
+      src: check_logmode.sql
+      dest: "{{ oracle_tmp }}/check_logmode.sql"
+  - name: check the logmode
+    command: "sqlplus / as sysdba @{{ oracle_tmp }}/check_logmode.sql"
+    register: logmode
+    failed_when: '"NOARCHIVELOG" in logmode.stdout'
+  when: inventory_hostname == master_node
+  
+- include_tasks: update_TNS_and_Listener_Configuration.yml
+
+- include_tasks: Primary_database_setup.yml
+
+- include_tasks: Create_pfile.yml
+
+- include_tasks: scp_spfile.yml
+
+- include_tasks: create_and_scp_controlfile.yml
+
+- name: create adump dir
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  file:
+    path: "{{ oracle_base }}/admin/{{ oracle_db_name }}/adump"
+    state: directory
+  when: inventory_hostname != master_node
+
+- name: Entry for the new database
+  lineinfile:
+    path: /etc/oratab
+    line: '{{ oracle_db_name }}:{{ oracle_home }}:N		# line added by Agent'
+  when: inventory_hostname != master_node
+
+- name: Change the LOG_MODE
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  block:
+  - name: Copy the startup_nomount.sql file
+    copy: 
+      src: startup_nomount.sql
+      dest: "{{ oracle_tmp }}/startup_nomount.sql"
+  - name: change the logmode
+    command: "sqlplus / as sysdba @{{ oracle_tmp }}/startup_nomount.sql"
+    register: opt4
+    failed_when: '"ERROR" in opt4.stdout'
+  when: inventory_hostname != master_node
+
+- include_tasks: duplicate_database.yml

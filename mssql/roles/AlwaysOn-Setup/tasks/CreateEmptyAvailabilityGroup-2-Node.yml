@@ -1,0 +1,164 @@
+---
+- name: Copy CreateEmptyAvailabilityGroup-2-Node file
+  win_template:
+    src: CEAG-2-Node/{{ item.file }}.j2
+    dest: c:\Ansible\Temp\{{ item.file }}.sql
+  when: (ansible_hostname | lower ) == ( item.Replica | lower )
+  with_items:
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-2-Node-01P }
+      - { Replica: '{{ SecondaryReplica }}', file: CEAG-2-Node-02S }
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-2-Node-03P }
+      - { Replica: '{{ SecondaryReplica }}', file: CEAG-2-Node-04S }
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-2-Node-05P }
+
+
+# - name: Run CreateEmptyAvailabilityGroup-2-Node
+#   win_shell:
+#     sqlcmd -i c:\Ansible\Temp\{{ item.file }}.sql > c:\Ansible\Logs\{{ item.file }}.log
+#   register: checklog
+#   failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+#   when: (ansible_hostname | lower ) == ( item.Replica | lower )
+#   with_items:
+#       - { Replica: '{{ PrimaryReplica }}' , file: CEAG-2-Node-01P }
+#       - { Replica: '{{ SecondaryReplica }}' , file: CEAG-2-Node-02S }
+#       - { Replica: '{{ PrimaryReplica }}' , file: CEAG-2-Node-03P }
+#       - { Replica: '{{ SecondaryReplica }}' , file: CEAG-2-Node-04S }
+#       - { Replica: '{{ PrimaryReplica }}' , file: CEAG-2-Node-05P }
+
+- name: Debug hostname
+  debug: "{{ ansible_hostname }}"
+
+- name: Debug replica
+  debug: "{{ PrimaryReplica }}"
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node on CEAG-2-Node-01P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-01P.sql > c:\Ansible\Logs\CEAG-2-Node-01P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+- name: Debug hostname
+  debug: "{{ ansible_hostname }}"
+
+- name: Debug replica
+  debug: "{{ SecondaryReplica }}"
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node CEAG-2-Node-02S
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-02S.sql > c:\Ansible\Logs\CEAG-2-Node-02S.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( SecondaryReplica | lower )
+
+- name: Debug hostname
+  debug: "{{ ansible_hostname }}"
+
+- name: Debug replica
+  debug: "{{ PrimaryReplica }}"
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node CEAG-2-Node-03P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-03P.sql > c:\Ansible\Logs\CEAG-2-Node-03P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+- name: Debug hostname
+  debug: "{{ ansible_hostname }}"
+
+- name: Debug replica
+  debug: "{{ SecondaryReplica }}"
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node CEAG-2-Node-04S CEAG-2-Node-04S
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-04S.sql > c:\Ansible\Logs\CEAG-2-Node-04S.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( SecondaryReplica | lower )
+
+- name: Debug hostname
+  debug: "{{ ansible_hostname }}"
+
+- name: Debug replica
+  debug: "{{ PrimaryReplica }}"
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node on CEAG-2-Node-05P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-05P.sql > c:\Ansible\Logs\CEAG-2-Node-05P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+# - name: Copy CreateEmptyAvailabilityGroup-2-Node file on Primary
+#   win_template:
+#     src: ../templates/CEAG-2-Node/{{ PrimaryFile }}.j2
+#     dest: c:\Ansible\Temp\{{ PrimaryFile }}.sql
+#   loop:
+#   - CEAG-2-Node-01P
+#   - CEAG-2-Node-03P
+#   - CEAG-2-Node-05P
+#   loop_control:
+#     loop_var: PrimaryFile
+#   when: ansible_hostname == PrimaryReplica
+
+# - name: Copy CreateEmptyAvailabilityGroup-2-Node file on Secondary
+#   win_template:
+#     src: ../templates/CEAG-2-Node/{{ Secondary }}.j2
+#     dest: c:\Ansible\Temp\{{ Secondary }}.sql
+#   loop:
+#   - CEAG-2-Node-02S
+#   - CEAG-2-Node-04S
+#   loop_control:
+#     loop_var: Secondary
+#   when: ansible_hostname == SecondaryReplica
+
+# - name: Run CEAG-2-Node-01P
+#   win_shell:
+#     sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-01P.sql > c:\Ansible\Logs\CEAG-2-Node-01P.log
+#   register: checklog_01P
+#   failed_when: '"Failed" in checklog_01P.stdout'
+#   when: ansible_hostname == PrimaryReplica
+
+# - name: Run CEAG-2-Node-02S
+#   win_shell:
+#     sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-02S.sql > c:\Ansible\Logs\CEAG-2-Node-02S.log
+#   register: checklog_02S
+#   failed_when: '"Failed" in checklog_02S.stdout'
+#   when: ansible_hostname == SecondaryReplica
+
+# - name: Run CEAG-2-Node-03P
+#   win_shell:
+#     sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-03P.sql > c:\Ansible\Logs\CEAG-2-Node-03P.log
+#   register: checklog_03P
+#   failed_when: '"Failed" in checklog_03P.stdout'
+#   when: ansible_hostname == PrimaryReplica
+
+# - name: Run CEAG-2-Node-04S
+#   win_shell:
+#     sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-04S.sql > c:\Ansible\Logs\CEAG-2-Node-04S.log
+#   register: checklog_04S
+#   failed_when: '"Failed" in checklog_04S.stdout'
+#   when: ansible_hostname == SecondaryReplica
+
+# - name: Run CEAG-2-Node-05P
+#   win_shell:
+#     sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-05P.sql > c:\Ansible\Logs\CEAG-2-Node-05P.log
+#   register: checklog_05P
+#   failed_when: '"Failed" in checklog_05P.stdout'
+#   when: ansible_hostname == PrimaryReplica
+
+
+# - name: CreateEmptyAvailabilityGroup-2-Node
+#   win_template:
+#     src: ../templates/CreateEmptyAvailabilityGroup-2-Node.j2
+#     dest: c:\Ansible\Temp\CreateEmptyAvailabilityGroup-2-Node.sql
+
+
+# - name: CreateEmptyAvailabilityGroup-2-Node
+#   win_shell:
+#     sqlcmd -i c:\Ansible\Temp\CreateEmptyAvailabilityGroup-2-Node.sql > c:\Ansible\Logs\CreateEmptyAvailabilityGroup-2-Node.log
+
+# - name: Read the logfile
+#   win_shell:
+#     gc c:\Ansible\Logs\CreateEmptyAvailabilityGroup-2-Node.log

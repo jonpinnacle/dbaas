@@ -1,0 +1,24 @@
+---
+- name: POST in CATALOG DATA
+  block: 
+  - name: Insert Message into CATALOG DATA
+    uri:
+      url: "{{ apex_url }}/{{ apex_uri }}/catalog/post_json"
+      validate_certs: no  # should be removed after https certs becomes renewed
+      method: POST
+      body_format: json
+      body:  "{{ json_catalog }}"
+      headers:
+        Content-Type: "application/json"
+        Cache-Control: "no-cache"
+        catalog_dest: "{{ catalog_dest }}"
+    register: catalog_json_response
+  rescue:
+  - name: Store the Json If APEX Server Is Down
+    delegate_to: localhost
+    become: False
+    lineinfile:
+      path: "{{ json_backup_dir }}/catalog_json_response.json"
+      line: "{{ catalog_json_response  | to_json }}"
+      create: yes
+    when: catalog_json_response.status == "500" or  catalog_json_response.status == -1

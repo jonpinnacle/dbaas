@@ -1,0 +1,10 @@
+- name: check for files
+  win_stat:
+    path: 'D:\{{ folder }}'
+  register: folder_check
+
+- name: move file and folders
+  win_shell: |
+    move D:\{{ folder }}\ D:\Install\SQL{{ SqlVersion }} 
+  when: folder_check.stat.exists == true 
+  ignore_errors: yes

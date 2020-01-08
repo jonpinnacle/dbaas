@@ -1,0 +1,50 @@
+---
+
+- block:
+  - name: create {{ deinstall_product }}_deinstall.rsp file
+    template:
+      owner: "{{ oracle_user }}"
+      src: "{{ deinstall_product }}_deinstall.rsp.j2"
+      dest: "{{ oracle_tmp }}/{{ deinstall_product }}_deinstall.rsp"
+
+  ## Need something to look for to know when this has already run
+  - name: Run Deinstall
+    become_user: "{{ oracle_user }}"
+    command: "{{ oracle_home }}/deinstall/deinstall -silent -paramfile {{ oracle_tmp }}/{{ deinstall_product }}_deinstall.rsp"
+    register: deinstall_cmd
+#    failed_when: "'ERROR' in deinstall_cmd.stdout"
+
+  - name: debugging deinstall_cmd
+    debug: 
+      var: deinstall_cmd
+      
+  - name: save deinstall stdout
+    copy:
+      dest: "{{ oracle_tmp }}/{{ deinstall_product }}_deinstall_cmd.out"
+      content: "{{ deinstall_cmd.stdout }}"
+
+  - name: save deinstall stderr
+    copy:
+      dest: "{{ oracle_tmp }}/{{ deinstall_product }}_deinstall_cmd.err"
+      content: "{{ deinstall_cmd.stderr }}"
+    when: deinstall_cmd.stderr_lines | length > 0
+     
+  when: inventory_hostname == master_node
+
+- name: get script path
+  set_fact:
+    script_path: "{{ hostvars[master_node]['deinstall_cmd']['stdout'] | regex_search('/tmp/deinstall[^/]*') }}"
+
+- include_tasks: exec_rootcrsdc_script.yml
+  when: 
+  - inventory_hostname == curr_node
+  - inventory_hostname != master_node  
+  - '"crsdc.run" in hostvars[master_node]["deinstall_cmd"]["stdout"]'
+  loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+  loop_control:
+    loop_var: curr_node
+
+- include_tasks: exec_rootdeinstall_script.yml
+  when: 
+  - '"rootdeinstall.sh" in hostvars[master_node]["deinstall_cmd"]["stdout"]'
+  - inventory_hostname == master_node

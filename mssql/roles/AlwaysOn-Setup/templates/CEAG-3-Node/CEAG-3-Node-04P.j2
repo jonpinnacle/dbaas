@@ -1,0 +1,24 @@
+:setvar PrimaryReplica {{ PrimaryReplica }} 
+:setvar SecondaryReplica {{ SecondaryReplica }} 
+:setvar DrReplica {{ DrReplica }} 
+:setvar EndPointPort {{ EndPointPort }}
+:setvar AvailabilityGroup {{ AvailabilityGroup }}
+:setvar Listener {{ Listener }} 
+:setvar IPListener {{ IPListener }}
+:setvar IPListener2 {{ IPListener2 }}
+:setvar ListenerPort {{ ListenerPort }}
+:setvar ListenerSubnet {{ ListenerSubnet }} 
+:setvar ListenerSubnet2 {{ ListenerSubnet2 }}
+
+:Connect $(PrimaryReplica)
+ 
+IF EXISTS(SELECT * FROM sys.server_event_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER WITH (STARTUP_STATE=ON);
+END
+IF NOT EXISTS(SELECT * FROM sys.dm_xe_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER STATE=START;
+END
+ 
+GO

@@ -1,0 +1,19 @@
+---
+- name : Rename the configuration.ini file
+  win_copy:
+    src: '{{ SystemPath }}DBA\Scripts\DBA_-_Collect_Inventory_Info.sql'
+    dest: '{{ SystemPath }}DBA\Scripts\{{ ansible_hostname }}-DBA_-_Collect_Inventory_Info.sql'
+    remote_src: True
+
+- name: Update the sql job file
+  win_lineinfile:
+    path: '{{ SystemPath }}DBA\Scripts\{{ ansible_hostname }}-DBA_-_Collect_Inventory_Info.sql'
+    backrefs: yes
+    regexp: "{{ ChangeMe.name }}"
+    line: "{{ ChangeMe.value }}"
+  loop:
+  - { name: 'ChangeMe-OutPutFile', value: '{{ SystemPath }}' }
+  - { name: 'ChangeMe-ScriptPath', value: 'F:' }
+  - { name: 'ChangeMe-LogPath', value: 'F:' }
+  loop_control:
+    loop_var: ChangeMe

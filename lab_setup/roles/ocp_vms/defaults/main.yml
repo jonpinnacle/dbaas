@@ -1,0 +1,22 @@
+---
+# defaults file for ocp_vms
+oci_user: ocid1.user.oc1..aaaaaaaaxhcd3h3kaerknpjujypz5ydhyuo2xkrwrguyi7647cowpfyc2sca
+oci_user_fingerprint: 48:98:c1:b7:3c:13:3d:50:0e:79:71:fd:99:24:68:ad
+oci_region: tvyk:PHX-AD-2
+oci_location: us-phoenix-1
+oci_shape: VM.Standard.E2.1.Micro
+oci_image_id: ocid1.image.oc1.phx.aaaaaaaauuj2b3bvpbtpcyrfdvxu7tuajrwsmajhn6uhvx4oquecap63jywa
+oci_compartment_id: ocid1.tenancy.oc1..aaaaaaaaetgwbu5n4t4bhy6vxbh5rspzgqz6p7yhve235cxzdodg5lkabnva
+oci_subnet_id: ocid1.subnet.oc1.phx.aaaaaaaauqooyf4slwgq2dqufoiigvzoba2oudrtwrwxwa5d5kmbec2wqela
+oci_user_key_file: "{{ playbook_dir }}/roles/{{ role_name }}/files/oci_api_key.pem"
+platform_vendor: COMMON
+oci_disks:
+  - { name: b, size: 80 }
+  - { name: c, size: 50 }
+  - { name: d, size: 50 }
+  - { name: e, size: 50 }
+  - { name: f, size: 50 }
+  - { name: g, size: 50 }
+  - { name: h, size: 50 }
+  - { name: i, size: 50 }
+  - { name: j, size: 50 }

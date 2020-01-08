@@ -1,0 +1,31 @@
+---
+oracle_version: 12.1.0.2
+
+grid_version: 12.1.0.2
+
+install_base: /u01/app
+
+oracle_base: "{{ install_base }}/oracle"
+
+oracle_db_name: +ASM
+
+oracle_user: oracle
+
+oracle_group: oinstall
+
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+db_list: []
+
+db_name_list: []
+
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB
+
+oracle_features_tmp: /u01/tmp/
+
+feature_files:
+  - product_stats.sql
+  - feature_stats.sql
+
+standard_task_id: "0"
+apex_url: "https://apex-dev.techlab.com:8443/ords/invent2"

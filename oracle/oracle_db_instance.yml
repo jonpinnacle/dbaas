@@ -1,0 +1,43 @@
+---
+
+- name: Create DB Instance
+  hosts: '{{ host }}'
+  become: yes
+  tasks:
+  - import_role:
+      name: oracle_create_db
+
+
+  ## Required Vars:
+  # oracle_db_home - This is where the upgrade will be move to (e.g. db_1) 
+  # oracle_db_name - The db to be created
+  # application_name
+
+  ## Optional Vars:
+  # oracle_version (default: 12.1.0.2) 
+  # oracle_pdb_name
+  # oracle_pdb_passwd
+  # business_unit
+  # technical_contact
+  # tech_contact_email
+  # app_desc
+  # app_owner
+  # app_owner_email
+  # environment
+  # database_role 
+  # pci_required
+  # sox_required
+  # encryption_required 
+  # dataguard
+  # golden_gate
+  # backup_enabled 
+  # end_of_life
+  # db_monitoring_tool 
+  # monitoring
+  # comments
+  # instance_count
+  # db_source
+  # dr_solution
+  # dr_location
+  # env_category 
+  # storage_type

@@ -1,0 +1,54 @@
+oracle.install.responseFileVersion=/oracle/install/rspfmt_crsinstall_response_schema_v12.1.0
+ORACLE_HOSTNAME={{ ansible_fqdn }}
+INVENTORY_LOCATION={{ oracle_base }}/oraInventory
+SELECTED_LANGUAGES=en
+oracle.install.option={{ grid_install_mode }}
+ORACLE_BASE={{ oracle_base }}/oracle
+ORACLE_HOME={{ oracle_grid_home }}
+oracle.install.asm.OSDBA={{ oracle_dba_group }}
+oracle.install.asm.OSOPER={{ oracle_dba_group }}
+oracle.install.asm.OSASM={{ oracle_dba_group }}
+oracle.install.crs.config.gpnp.gnsClientDataFile=
+oracle.install.crs.config.gpnp.gnsSubDomain=
+oracle.install.crs.config.gpnp.gnsVIPAddress=
+oracle.install.crs.config.ipmi.bmcUsername=
+oracle.install.crs.config.ipmi.bmcPassword=
+oracle.install.asm.SYSASMPassword={{ oracle_asm_syspass }}
+oracle.install.asm.diskGroup.diskDiscoveryString={{ asm_disk_location }}/*
+oracle.install.asm.monitorPassword={{ oracle_asm_syspass }}
+oracle.install.asm.ClientDataFile=
+oracle.install.crs.config.ignoreDownNodes=false
+oracle.install.config.managementOption=NONE
+oracle.install.config.omsHost=
+oracle.install.config.omsPort=0
+oracle.install.config.emAdminUser=
+oracle.install.config.emAdminPassword=
+{% if (
+      grid_install_mode == "CRS_CONFIG" or
+      grid_install_mode == "CRS_SWONLY" or
+      grid_install_mode == "UPGRADE") -%}
+oracle.install.crs.config.gpnp.scanName={{ cluster_name }}.{{ cluster_domain }}
+oracle.install.crs.config.gpnp.scanPort={{ scan_port }}
+oracle.install.crs.config.ClusterType={{ cluster_type }}
+oracle.install.crs.config.clusterName={{ cluster_name }}
+oracle.install.crs.config.gpnp.configureGNS=false
+oracle.install.crs.config.autoConfigureClusterNodeVIP=true
+oracle.install.crs.config.gpnp.gnsOption=CREATE_NEW_GNS
+oracle.install.crs.config.clusterNodes={{ cluster_nodes_table | join(',') }}
+oracle.install.crs.config.networkInterfaceList={{ crs_net_interfaces | join(',') }}
+oracle.install.crs.config.storageOption={{ grid_storage_type }}
+oracle.install.crs.config.sharedFileSystemStorage.votingDiskLocations=
+oracle.install.crs.config.sharedFileSystemStorage.votingDiskRedundancy=NORMAL
+oracle.install.crs.config.sharedFileSystemStorage.ocrLocations={{ asm_ocr_paths_find_result | json_query('files[].path') | join(',') }}
+oracle.install.crs.config.sharedFileSystemStorage.ocrRedundancy=NORMAL
+oracle.install.crs.config.useIPMI=false
+oracle.install.asm.diskGroup.name={{ asm_ocr_group }}
+oracle.install.asm.diskGroup.redundancy=NORMAL
+oracle.install.asm.diskGroup.AUSize=1
+oracle.install.asm.diskGroup.disks={{ asm_ocr_paths_find_result | json_query('files[].path') | join(',') }}
+{% else %}
+oracle.install.asm.diskGroup.name={{ asm_data_group }}
+oracle.install.asm.diskGroup.redundancy=EXTERNAL
+oracle.install.asm.diskGroup.AUSize=1
+oracle.install.asm.diskGroup.disks={{ asm_data_paths_find_result | json_query('files[].path') | join(',') }}
+{% endif %}

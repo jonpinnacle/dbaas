@@ -1,0 +1,78 @@
+---
+- name: Copy CreateEmptyAvailabilityGroup-2-Node-with-DR file
+  win_template:
+    src: CEAG-2-Node-DR/{{ item.file }}.j2
+    dest: c:\Ansible\Temp\{{ item.file }}.sql
+  when: (ansible_hostname | lower ) == ( item.Replica | lower )
+  with_items:
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-2-Node-DR-01P }
+      - { Replica: '{{ SecondaryReplica }}', file: CEAG-2-Node-DR-02S }
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-2-Node-DR-03P }
+      - { Replica: '{{ SecondaryReplica }}', file: CEAG-2-Node-DR-04S }
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-2-Node-DR-05P }
+      - { Replica: '{{ SecondaryReplica }}', file: CEAG-2-Node-DR-06S }
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-2-Node-DR-07P }
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node-with-DR for PrimaryReplica on  CEAG-2-Node-DR-01P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-DR-01P.sql > c:\Ansible\Logs\CEAG-2-Node-DR-01P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node-with-DR for SecondaryReplica on CEAG-2-Node-DR-02S
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-DR-02S.sql > c:\Ansible\Logs\CEAG-2-Node-DR-02S.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( SecondaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node-with-DR for PrimaryReplica on CEAG-2-Node-DR-03P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-DR-03P.sql > c:\Ansible\Logs\CEAG-2-Node-DR-03P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node-with-DR for SecondaryReplica on CEAG-2-Node-DR-04S
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-DR-04S.sql > c:\Ansible\Logs\CEAG-2-Node-DR-04S.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( SecondaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node-with-DR for PrimaryReplica on CEAG-2-Node-DR-05P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-DR-05P.sql > c:\Ansible\Logs\CEAG-2-Node-DR-05P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node-with-DR for SecondaryReplica on CEAG-2-Node-DR-06S
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-DR-06S.sql > c:\Ansible\Logs\CEAG-2-Node-DR-06S.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( SecondaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-2-Node-with-DR for PrimaryReplica on CEAG-2-Node-DR-07P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-2-Node-DR-07P.sql > c:\Ansible\Logs\CEAG-2-Node-DR-07P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+
+# - name: CreateEmptyAvailabilityGroup-2-Node-with-DR
+#   win_template:
+#     src: ../templates/CreateEmptyAvailabilityGroup-2-Node-with-DR.j2
+#     dest: c:\Ansible\Temp\CreateEmptyAvailabilityGroup-2-Node-with-DR.sql
+
+
+# - name: CreateEmptyAvailabilityGroup-2-Node-with-DR
+#   win_shell:
+#     sqlcmd  -i c:\Ansible\Temp\CreateEmptyAvailabilityGroup-2-Node-with-DR.sql > C:\Ansible\Logs\CreateEmptyAvailabilityGroup-2-Node-with-DR.log
+
+# - name: Read the logfile
+#   win_shell:
+#     gc C:\Ansible\Logs\CreateEmptyAvailabilityGroup-2-Node-with-DR.log

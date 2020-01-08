@@ -1,0 +1,9 @@
+---
+- name: Cleanup demo hosts
+  hosts: localhost
+  gather_facts: true
+  connection: local
+  roles:
+    - role: demo_clean
+  tasks:
+    - meta: refresh_inventory

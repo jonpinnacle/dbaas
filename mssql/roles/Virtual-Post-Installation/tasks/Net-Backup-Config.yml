@@ -1,0 +1,9 @@
+---
+- name: Copy Net Backup Config file
+  win_template: 
+    src: ../templates/Net-Backup-Config.j2
+    dest: c:\Ansible\Temp\Net-Backup-Config.ps1
+
+- name: Run Net Backup Config Script
+  win_shell: |
+     c:\Ansible\Temp\Net-Backup-Config.ps1 > c:\Ansible\Logs\Net-Backup-Config.log

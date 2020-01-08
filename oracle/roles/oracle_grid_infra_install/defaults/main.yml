@@ -1,0 +1,45 @@
+---
+grid_version: 12.1.0.2
+# installation mode. Avaialable modes are : CRS_CONFIG | HA_CONFIG | UPGRADE | CRS_SWONLY | HA_SWONLY
+grid_install_mode: HA_CONFIG
+
+cluster_type: STANDARD
+cluster_name: ""
+cluster_domain: ""
+
+# location for temporary installation files
+oracle_tmp: /u01/tmp/{{ grid_version }}
+oracle_base: /u01/app
+oracle_db_home: db_1
+oracle_asm_name: +ASM
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB
+oracle_grid_home: "{{ oracle_base }}/{{ grid_version }}/grid_1"
+
+# LOCAL_ASM_STORAGE | FLEX_ASM_STORAGE | CLIENT_ASM_STORAGE | FILE_SYSTEM_STORAGE
+grid_storage_type: LOCAL_ASM_STORAGE
+
+public_net:
+- bond0
+- eth0
+- ens192
+
+private_net: "10.10.100"
+
+scan_name: ""
+scan_port: 1521
+
+asm_disk_location: /dev/oracleasm/disks
+asm_data_group: DATA
+asm_data_pattern: D*
+asm_data_redun: external
+asm_reco_group: RECO
+asm_reco_pattern: R*
+asm_reco_redun: external
+asm_ocr_group: OCR_VOTE
+asm_ocr_pattern: GRID_DISK*
+
+grid_images:
+- linuxamd64_12102_grid_1of2.zip
+- linuxamd64_12102_grid_2of2.zip
+
+standard_task_id_val: "0"

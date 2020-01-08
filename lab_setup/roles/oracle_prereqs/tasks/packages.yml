@@ -1,0 +1,155 @@
+---
+## NOTE: Remove for actual released version
+- name: install yum utils
+  yum: 
+    name: yum-utils
+    state: present
+
+- name: remove old kernels from the OS keeping only the last most recent
+  command: /usr/bin/package-cleanup --oldkernels --count=1 -y
+
+- name: check if epel.repo file exists
+  stat:
+    path: /etc/yum.repos.d/epel.repo
+  register: epel_stat_result
+
+- name: ensure EPEL is set to disabled
+  replace:
+    path: /etc/yum.repos.d/epel.repo
+    regexp: '^enabled=1'
+    replace: 'enabled=0'
+  when: epel_stat_result.stat.exists
+
+- name: fix uncomplete transactions if there are any
+  shell: /sbin/yum-complete-transaction -y
+
+- name: Yum Update
+  yum:
+    name: '*'
+    state: latest
+
+- name: install dev tools
+  yum: 
+    name: "@Development tools" 
+    state: present
+
+- name: install x86 oracle dependencies for 11R2 (OEL)
+  yum:
+    name: oracle-rdbms-server-11gR2-preinstall.x86_64
+  when: ansible_distribution == "OracleLinux" and oracle_version | regex_replace ('^([0-9]{1,2}.[0-9]{1,}.[0-9]{1,})(.*)$','\g<1>') == "11.2.0"
+
+- name: install x86 oracle dependencies for 11g (RedHat)
+  yum: 
+   name: |
+    binutils,
+    compat-libstdc++-33,
+    compat-libstdc++-33.i686,
+    gcc,
+    gcc-c++,
+    glibc,
+    glibc.i686,
+    glibc-devel,
+    glibc-devel.i686,
+    ksh,
+    libgcc,
+    libgcc.i686,
+    libstdc++,
+    libstdc++.i686,
+    libstdc++-devel,
+    libstdc++-devel.i686,
+    libaio,
+    libaio.i686,
+    libaio-devel,
+    libaio-devel.i686,
+    libXext,
+    libXext.i686,
+    libXtst,
+    libXtst.i686,
+    libX11,
+    libX11.i686,
+    libXau,
+    libXau.i686,
+    libxcb,
+    libxcb.i686,
+    libXi,
+    libXi.i686,
+    make,
+    sysstat,
+    unixODBC,
+    unixODBC-devel,
+    zlib-devel,
+    elfutils-libelf-devel
+   state: present
+  when: ansible_distribution == "RedHat" and oracle_version | regex_replace ('^([0-9]{1,2})(.*)$','\g<1>') == "11"
+
+- name: install x86 oracle dependencies for 12R1 (OEL)
+  yum:
+    name: oracle-rdbms-server-12cR1-preinstall
+  when: ansible_distribution == "OracleLinux" and oracle_version | regex_replace ('^([0-9]{1,2}.[0-9]{1,}.[0-9]{1,})(.*)$','\g<1>') == "12.1.0"
+
+- name: install x86 oracle dependencies for 12R2 (OEL)
+  yum:
+    name: oracle-database-server-12cR2-preinstall.x86_64
+  when: ansible_distribution == "OracleLinux" and oracle_version | regex_replace ('^([0-9]{1,2}.[0-9]{1,}.[0-9]{1,})(.*)$','\g<1>') == "12.2.0"
+
+- name: install x86 oracle dependencies for 12c (RedHat)
+  yum: 
+   name: |
+    binutils,
+    compat-libcap1,
+    compat-libstdc++-33,
+    compat-libstdc++-33.i686,
+    gcc,
+    gcc-c++,
+    glibc,
+    glibc.i686,
+    glibc-devel,
+    glibc-devel.i686,
+    ksh,
+    libgcc,
+    libgcc.i686,
+    libstdc++,
+    libstdc++.i686,
+    libstdc++-devel,
+    libstdc++-devel.i686,
+    libaio,
+    libaio.i686,
+    libaio-devel,
+    libaio-devel.i686,
+    libXext,
+    libXext.i686,
+    libXtst,
+    libXtst.i686,
+    libX11,
+    libX11.i686,
+    libXau,
+    libXau.i686,
+    libxcb,
+    libxcb.i686,
+    libXi,
+    libXi.i686,
+    make,
+    sysstat,
+    unixODBC,
+    unixODBC-devel,
+    zlib-devel,
+    zlib-devel.i686
+   state: present
+  when: ansible_distribution == "RedHat" and oracle_version | regex_replace ('^([0-9]{1,2})(.*)$','\g<1>') == "12"
+
+- name: install epel
+  yum:
+    name: |
+      oracle-epel-release-el7,
+      oracle-release-el7
+  when: ansible_distribution == "OracleLinux"
+
+- name: execute repo script
+  shell: /usr/bin/ol_yum_configure.sh
+  when: ansible_distribution == "OracleLinux"
+
+- name: install s3 dependencies
+  yum:
+    name: |
+      python-boto3,
+      python2-botocore

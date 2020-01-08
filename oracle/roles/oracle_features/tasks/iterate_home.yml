@@ -1,0 +1,14 @@
+---
+- name: Get Database name
+  environment: "{{ ora_user_env }}"
+  shell: "srvctl status database -thishome | grep -B1 'Database is running.'| awk -F : 'NF > 1 {print $2}'"
+  changed_when: False
+  register: db_name_info
+  vars:
+    oracle_home: "{{ item }}"
+
+- set_fact:
+    db_name: "{{db_name_info.stdout | trim}}"
+
+- set_fact:
+    db_info: "{{ db_info | combine( {item:db_name} ) }}"

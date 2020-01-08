@@ -1,0 +1,28 @@
+---
+# Copyright (c) 2018, 2019 Oracle and/or its affiliates.
+# This software is made available to you under the terms of the GPL 3.0 license or the Apache 2.0 license.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# Apache License v2.0
+# See LICENSE.TXT for details.
+
+
+- name: Create bastion server
+  oci_instance:
+    availability_domain: "{{ bastion_availability_domain }}"
+    compartment_id: "{{ demo_compartment_ocid }}"
+    name: "{{ demo_bastion_instance_name }}"
+    image_id: "{{ bastion_image_ocid }}"
+    shape: "{{ bastion_shape }}"
+    vnic:
+        assign_public_ip: True
+        hostname_label: "{{ demo_bastion_host_name }}"
+        subnet_id: "{{ bastion_subnet_ocid }}"
+    metadata:
+      ssh_authorized_keys: "{{ lookup('file', demo_ssh_public_key)}}"
+    freeform_tags:
+      infra: "{{ infra_name }}"
+      type: bastion
+  register: result
+
+- set_fact:
+    bastion_instance_ocid: "{{ result.instance.id }}"

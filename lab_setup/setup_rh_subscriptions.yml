@@ -1,0 +1,24 @@
+---
+
+- name: setup redhad repos
+  hosts: "{{ host }}"
+  become: yes
+
+  vars:
+    rhel_user: scotteppler
+    rhel_pool_id: 8a85f98c615169510161521fc39053cd
+
+  vars_files:
+  - secret
+
+  tasks:
+  - name: subscribe to pool
+    redhat_subscription:
+      state: present
+      username: "{{ rhel_user }}"
+      password: "{{ rhel_passwd }}"
+      pool_ids: "{{ rhel_pool_id }}"
+
+  - name: enable repos
+    rhsm_repository:
+      name: rhel-7-server-optional-rpms

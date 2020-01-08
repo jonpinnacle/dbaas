@@ -1,0 +1,9 @@
+---
+- name: Copy Enable TCP and Set port  file
+  win_template: 
+    src: ../templates/Enable-TCP-Set-Port.j2
+    dest: c:\Ansible\Temp\Enable-TCP-Set-Port.ps1
+
+- name: Run Enable TCP and Set port 
+  win_shell: |
+     c:\Ansible\Temp\Enable-TCP-Set-Port.ps1 > c:\Ansible\Logs\Enable-TCP-Set-Port.log    

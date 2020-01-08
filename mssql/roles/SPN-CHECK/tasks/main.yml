@@ -1,0 +1,88 @@
+---
+
+- name: db checklist status post for Post-Check
+  include: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "SPN-Check"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "POST-Check for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- name: Create temp directory
+  win_file:
+    path: "{{ ansible_tmp }}"
+    state: directory
+
+
+- name:  Copy the SPN check script
+  win_template:
+    src: "SPN.ps1.j2"
+    dest: "{{ ansible_tmp }}\\SPN.ps1"
+  diff: false
+
+- name: Run the SPN check script
+  win_shell: "{{ ansible_tmp }}\\SPN.ps1"
+  register: spn_status
+
+
+- debug: msg=" Status of SPN check is  {{ spn_status }}"
+
+- set_fact:
+    checklist:
+    - name: SPN Status
+      expected_value: "SPN Sucessfully Registered"
+      actual_value: "{{ spn_status.stdout }}"
+      status: "{% if spn_status.stdout == 'SPN Sucessfully Registered' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+- name: Debug the checklist
+  debug:
+    msg: "{{ checklist }}"
+
+- name: Store the result in a json
+  win_copy:
+    dest: "{{ ansible_tmp }}/spn_status.json"
+    content: "{{ checklist }}"
+
+- name: db checklist status file upload for Post Check
+  include: db_checklist_status_file.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "SPN-Check"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload Checklist"
+    task_message: "Post-check {{ ansible_hostname }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    standard_task_id: "{{ standard_task_id }}"
+    logfile_path:  "{{ ansible_tmp }}/spn_status.json"
+  tags:
+  - apex_api
+
+- name: db checklist status post for Post Check
+  include: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "SPN-Check"
+    task_id: "{{ ticket_ref }}"
+    standard_task_id: "{{ standard_task_id }}"
+    task_status: "{% if checklist | json_query('[?status == `FAILED`]') | length > 1 -%}FAILED
+                  {%- else -%}SUCCESSFUL
+                  {%- endif %}"
+    task_message: "Post-check for {{ ansible_hostname }} "
+    tags:
+    - apex_api
+
+- name: Check for spn_status failure
+  fail:
+    msg: "{% if checklist | json_query('[?status == `FAILED`]') | length == 1 -%}You have 1 failed check
+          {%- else -%}You have {{ checklist | json_query('[?status == `FAILED`]') | length }} failed checks
+          {%- endif %}"
+  when: checklist | json_query('[?status == `FAILED`]') | length > 0
+  tags:
+    - postcheck_fail

@@ -1,0 +1,14 @@
+---
+- name: check OPatch version
+  environment: "{{ ora_user_env }}"
+  command: opatch version
+  ignore_errors: yes
+  register: opatch_version_output
+  changed_when: False
+
+- set_fact:
+    opatch_version: "{% if opatch_version_output is failed -%}MISSING
+                     {%- else -%}{{ opatch_version_output.stdout_lines[0] |
+                                    regex_replace('OPatch Version: (.*)','\\1')
+                                 }}
+                     {%- endif %}"

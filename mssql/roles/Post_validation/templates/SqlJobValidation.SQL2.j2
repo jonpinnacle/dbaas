@@ -1,0 +1,23 @@
+Invoke-SqlCmd -QueryTimeout 0 -query "declare @numberofjobs int =
+       (
+       select count(*) from sysjobs j where j.name in
+       ('DBA - All Database Backups',
+       'DBA - Backup Audit',
+       'DBA - Capture SQL Down Time',
+       'DBA - Checkdb',
+       'DBA - Collect Inventory Info',
+       'DBA - CompressDb',
+       'DBA - Cycle Error Log',
+       'DBA - Database Optimizations',
+       'DBA - Delete Old Log Files',
+       'DBA - Disater Recovery Preperation',
+       'DBA - Drop Old Tables in HOLDING',
+       'DBA - Hourly Transaction Log Backup',
+       'DBA - Monitor Disk Space',
+       'DBA - Transaction Log Backup Audit',
+       'DBA - Weekly WMI Reset')
+       and j.enabled = 1)
+
+       if @numberofjobs = 15
+       select 'Pass'
+       else select 'Fail'"

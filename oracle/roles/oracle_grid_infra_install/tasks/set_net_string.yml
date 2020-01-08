@@ -1,0 +1,42 @@
+---
+- name: get active network interfaces
+  set_fact:
+    active_net_ifs: "{% set active_net_ifs = active_net_ifs|default([]) + [hostvars[inventory_hostname]['ansible_' + net_interface]] %}{{ active_net_ifs|list }}"
+  when:
+    - hostvars[inventory_hostname]['ansible_' + net_interface]['active'] is defined
+    - hostvars[inventory_hostname]['ansible_' + net_interface]['active'] == true
+    - net_interface != 'lo'
+  loop: "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
+  loop_control:
+    loop_var: net_interface
+
+- name: debug private_net variable 
+  debug:
+    var: private_net
+    verbosity: 3
+
+- name: debug ip address variable
+  debug:
+    var: net_interface_detail.ipv4.address
+    verbosity: 3
+  when: net_interface_detail.ipv4 is defined
+  loop: "{{ active_net_ifs }}"
+  loop_control:
+    loop_var: net_interface_detail
+
+- name: set network details
+  set_fact:
+    crs_net_interfaces: |
+      {% if net_interface_detail['device'] in public_net -%}
+        {% set net_string = [ net_interface_detail['device'],net_interface_detail['ipv4']['network'],'1' ] %}
+      {% elif private_net in net_interface_detail['ipv4']['address'] -%}
+        {% set net_string = [ net_interface_detail['device'],net_interface_detail['ipv4']['network'],'2' ] %}
+      {% else -%}
+        {% set net_string = [ net_interface_detail['device'],net_interface_detail['ipv4']['network'],'3' ] %}
+      {%- endif %}
+      {% set crs_net_interfaces = crs_net_interfaces|default([]) + [ net_string | join(':') ] %}
+      {{ crs_net_interfaces }}
+  when: net_interface_detail.ipv4 is defined
+  loop: "{{ active_net_ifs }}"
+  loop_control:
+    loop_var: net_interface_detail

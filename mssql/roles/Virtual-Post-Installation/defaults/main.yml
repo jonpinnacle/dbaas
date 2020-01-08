@@ -1,0 +1,32 @@
+# Env1 = "Enter an Environment (LAB, DEV, UAT, TST, QA, SIT, DR, PRD)"
+Env1: DEV
+#"Enter the Domain Name (CHTR, Corp, DEV, TWCCORP, TWZDMZ, UAT)"
+Domain: Corp
+#DC = "Enter the  Data Center is this being built in (GVL, NCE, NCW)"
+DC: GVL
+#Version = "What SQL Version is being installed? (2012, 2014, 2016)"
+SqlVersion: 2014
+#SQL MGT Server Details
+SQLInst: 142.136.196.228
+username: admin
+# #  Enable TCP and Set port (enter "0" for Yes and "1" for No)
+resultTCP: 0 
+#FTP Server Deatils
+bin_server: https://vm0pnyumxxw0001.twcable.com/yum/source/SQL/
+ansible_tmp: C:\Ansible\Temp
+installer_location: '{{ ansible_tmp }}\mssql_bin'
+#\\10.10.98.50\c$
+#Charter_FileShare\CharterSQLInstallMedia
+# unc_username: techlab\svc.sqladmin
+
+
+#Backup Path
+BuPath: H:\
+#Data Path
+DataPath: G:\
+#Log Path
+LogPath: J:\
+#System Path
+SystemPath: F:\
+#Temdb Path
+TempdbPath: I:\

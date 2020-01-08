@@ -1,0 +1,11 @@
+---
+- name: prepare lab server for install
+  hosts: '{{ host }}'
+  become: yes
+  tasks:
+  - import_role:
+      name: oracle_prereqs
+
+  - import_role:
+      name: oracle_asm_config
+    #when: ansible_distribution == "OracleLinux"

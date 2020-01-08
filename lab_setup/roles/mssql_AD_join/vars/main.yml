@@ -1,0 +1,3 @@
+---
+# vars file for mssql_AD_join
+dns_name: ad.getfamiliar.com

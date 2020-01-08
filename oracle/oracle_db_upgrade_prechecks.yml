@@ -1,0 +1,35 @@
+---
+
+- name: upgrade oracle 11g database to 12c database
+  hosts: '{{ host }}'
+  become: yes
+  become_user: '{{ oracle_user }}'
+
+  vars:
+    oracle_tmp: /u01/tmp/{{ oracle_db_name }}
+    execute_pre_fixup: true
+
+  tasks:
+    - name: get db details
+      command: grep "^{{ oracle_db_name }}:" /etc/oratab
+      ignore_errors: yes
+      changed_when: false
+      register: db_details
+
+    - name: set oracle_home
+      set_fact:
+        oracle_home: "{{ db_details.stdout | regex_replace('^[^:]*:([^:]*).*', '\\1') }}"
+
+    - name: create tmp dir
+      file:
+        mode: 0755
+        path: "{{ oracle_tmp }}"
+        state: directory
+
+    - name: run prechecks
+      import_role:
+        name: oracle_upgrade
+        tasks_from: upgrade_prechecks
+
+  ## Required Vars
+  # oracle_db_name - The db to be upgraded

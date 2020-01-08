@@ -1,0 +1,12 @@
+---
+- name: install epel
+  yum:
+    name: |
+      epel-release
+
+- name: install s3 dependencies
+  yum:
+    name: |
+      python-boto,
+      python-boto3,
+      python2-botocore

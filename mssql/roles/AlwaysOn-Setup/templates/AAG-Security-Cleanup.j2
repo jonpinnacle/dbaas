@@ -1,0 +1,33 @@
+DECLARE @SPID NVARCHAR(5)
+DECLARE @Login NVARCHAR(50)
+DECLARE @SQL NVARCHAR(1000)
+
+SET @Login = '{{ Login }}'
+
+DECLARE LoginCursor CURSOR FOR 
+SELECT SPID FROM master..sysprocesses WHERE loginame = @Login
+
+OPEN LoginCursor
+
+FETCH NEXT FROM LoginCursor INTO @SPID
+
+WHILE @@FETCH_STATUS = 0
+
+BEGIN
+
+SET @SQL = 'KILL '+ @SPID
+PRINT @SPID
+ 
+FETCH NEXT FROM LoginCursor INTO @SPID
+
+END
+
+CLOSE LoginCursor
+DEALLOCATE LoginCursor
+
+Alter Authorization on endpoint::Hadr_endpoint to [sa]
+ALTER AUTHORIZATION ON AVAILABILITY GROUP::{{ AvailabilityGroup }} to [sa] ;
+
+SET @SQL = 'DROP LOGIN  [' + @Login +']' 
+EXEC (@SQL)
+

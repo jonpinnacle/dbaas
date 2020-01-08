@@ -1,0 +1,23 @@
+---
+new_oracle_home: "{{ oracle_base }}/product/{{ oracle_version }}/{{ oracle_db_home }}"
+
+oracle_user: oracle
+
+oracle_group: oinstall
+
+rac_flag: "{% if ansible_play_hosts | length > 1 -%}-localRacsid {{ oracle_sid }}
+          {%- else -%}
+          {%- endif %}"
+
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+# shell environment for the oracle user
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ oracle_sid }}"
+  ORACLE_UNQNAME: "{{ oracle_db_name }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ ansible_env.PATH }}:{{ oracle_home }}/bin"
+  TMP: "/u01/app/oracle"
+  TMPDIR: "/u01/app/oracle"

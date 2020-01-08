@@ -1,0 +1,25 @@
+---
+- name: install oracleasm tools
+  yum: 
+   name: oracleasm,oracleasm-support
+   state: present
+
+- name: configure oracleasm
+  command: oracleasm configure -u {{ oracle_user }} -g {{ oracle_group }} -D {{ asm_disk_location}} -b -e
+
+- name: initialize oracleasm
+  command: oracleasm init
+  ignore_errors: yes
+
+- name: get logical volumes for asm
+  find:
+    paths: "/dev/mapper"
+    file_type: any
+    patterns: ora--dg--*
+    use_regex: no
+  register: asm_disks
+
+- include_tasks: create_asm_disk.yml
+  loop: "{{ asm_disks.files }}"
+  loop_control:
+    loop_var: disk_info

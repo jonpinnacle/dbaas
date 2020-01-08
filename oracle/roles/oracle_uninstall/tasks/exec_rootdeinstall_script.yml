@@ -1,0 +1,23 @@
+---
+
+- name: execute rootdeinstall.sh
+  command: "{{ script_path }}/rootdeinstall.sh"
+  args:
+    removes: "{{ oracle_home }}"
+  ignore_errors: yes
+  failed_when: "'successfully deconfigured' not in rootdeinstall_script.stdout"
+  register: rootdeinstall_script
+
+- name: save rootdeinstall_script stdout
+  copy:
+    dest: "{{ oracle_tmp }}/rootdeinstall_script.out"
+    content: "{{ rootdeinstall_script.stdout }}"
+  when: rootdeinstall_script.changed
+
+- name: save rootdeinstall_script stderr
+  copy:
+    dest: "{{ oracle_tmp }}/rootdeinstall_script.err"
+    content: "{{ rootdeinstall_script.stderr }}"
+  when: 
+  - rootdeinstall_script.changed
+  - rootdeinstall_script.stderr_lines | length > 0

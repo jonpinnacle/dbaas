@@ -1,0 +1,7 @@
+Import-Module FailoverClusters 
+ 
+Get-ClusterResource "{{ AvailabilityGroup  }}_{{ Listener }}" | Set-ClusterParameter RegisterAllProvidersIP 0   
+Get-ClusterResource "{{ AvailabilityGroup  }}_{{ Listener }}"|Set-ClusterParameter HostRecordTTL 120  
+Stop-ClusterResource "{{ AvailabilityGroup  }}_{{ Listener }}"  
+Start-ClusterResource "{{ AvailabilityGroup  }}_{{ Listener }}"
+Start-ClusterResource "{{ AvailabilityGroup  }}"

@@ -1,0 +1,38 @@
+---
+
+oracle_compat_version: "{{ grid_version | regex_replace('^([0-9]{1,2}.[0-9]{1,}).*','\\1') }}"
+
+oracle_grid_home: "{{ oracle_grid_home }}"
+
+oracle_home: "{{ oracle_base }}/oracle/product/{{ grid_version }}/{{ oracle_db_home }}"
+
+oracle_sid: "{% if checklist_task == 'cluster' -%}{{ oracle_asm_name }}1
+             {%- else -%}{{ oracle_asm_name }}
+             {%- endif %}"
+
+oracle_user: oracle
+
+oracle_group: oinstall
+
+oracle_dba_group: dba
+
+diskgroup_failed: false
+
+# shell environment for the oracle user
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}/oracle"
+  ORACLE_SID: "{{ oracle_sid }}"
+  ORACLE_UNQNAME: "{{ oracle_asm_name }}"
+  ORACLE_HOME: "{{ oracle_grid_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ oracle_grid_home }}/bin:{{ ansible_env.PATH }}"
+  TMP: "/u01/app/oracle"
+  TMPDIR: "/u01/app/oracle"
+
+checklist_task: "{% if ansible_play_hosts | length == 1 -%}host
+                 {%- elif ansible_play_hosts | length > 1 -%}cluster
+                 {%- endif %}"
+
+cluster_nodes: "{{ ansible_play_hosts }}"
+
+master_node: "{{ ansible_play_hosts | sort | first }}"

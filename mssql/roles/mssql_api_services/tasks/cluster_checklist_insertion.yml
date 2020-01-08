@@ -1,0 +1,35 @@
+---
+
+- import_tasks: get_cluster_id.yml
+  when: cluster_id is not defined
+
+- name: Checklist Insert
+  block:
+    - name: POST To Insert into Checklist Details
+      win_uri:
+        url: "{{ apex_url }}/mssql_check_list"
+        validate_certs: no  # should be removed after https certs becomes renewed
+        method: POST
+        body_format: json
+        body: 
+          cluster_name: "{{ cluster_name }}"
+        status_code: 
+          - 200
+          - 201
+        return_content: yes
+        headers:
+          Content-Type: "application/json"
+      register: checklist_insrt_response
+
+    - name: set checklist_id
+      set_fact:
+        checklist_name: "{{ checklist_insrt_response.json | json_query('ID') }}"
+
+  rescue:
+  - name: Store the Json If APEX Server Is Down
+    delegate_to: localhost
+    win_lineinfile:
+      path: "{{ json_backup_dir }}/{{ cluster_name }}_cluster_chklst_updates.json"
+      line: '{"cluster_id": "{{ cluster_id }}", "update": {{ cluster_chklst_json_body | to_json }} }'
+      create: yes
+    when: checklist_insrt_response.status_code == 500 or checklist_insrt_response.status_code == -1

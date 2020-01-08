@@ -1,0 +1,69 @@
+---
+
+- name: ensure product to deinstall has been specified
+  fail:
+    msg: Please pass either 'database' or 'grid' for deinstall_product
+  when: deinstall_product is not defined or
+        (deinstall_product != 'database' and
+        deinstall_product != 'grid')
+
+- name: get asm disk paths - {{ asm_data_group }}
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ asm_data_pattern }}"
+    use_regex: no
+  register: asm_data_paths_find_result
+
+- name: create cluster_node_string
+  set_fact:
+    cluster_node_string: "{{ cluster_node_string | default([]) }} + [ '{{ hostvars[node_name]['ansible_hostname'] }}' ]"
+  loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+  loop_control:
+    loop_var: node_name
+
+- name: get db details
+  command: grep ":{{ oracle_home }}:" /etc/oratab
+  register: db_details
+  ignore_errors: yes
+  changed_when: False
+
+- name: create db_list
+  set_fact:
+    db_list: "{{ db_list }} + [ '{{ item | regex_replace('^([^:]*).*','\\1') }}' ]"
+  loop: "{{ db_details.stdout_lines }}"
+
+- include_tasks: deinstall.yml
+
+- name: get oraInventory location
+  slurp:
+    src: /etc/oraInst.loc
+  register: orainst_file
+- set_fact:
+    orainst_location: "{{ 
+                          orainst_file.content | 
+                          b64decode | 
+                          regex_search('inventory_loc=.*') | 
+                          regex_replace('inventory_loc=(.*)','\\1')
+                      }}"
+
+- name: check for running processes in {{ oracle_home }}
+  shell: ps -ef| grep {{ oracle_home }} | grep d.bin | grep -v grep | wc -l
+  failed_when: process_check.stdout == 0
+  register: process_check
+  when: deinstall_product == 'grid'
+
+- name: cleanup Oracle Grid directories
+  file:
+    path: "{{ item }}"
+    state: absent
+  when: deinstall_product == 'grid'
+  loop:
+  - "{{ install_base }}/{{ oracle_version }}"
+  - "{{ oracle_base }}/admin"
+  - "/etc/oracle"
+  - "/etc/oraInst.loc"
+  - "/etc/oratab"
+  - "{{ orainst_location }}"
+  - "/var/tmp/.oracle"
+  - "{{ oracle_base }}/diag"

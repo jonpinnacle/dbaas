@@ -1,0 +1,41 @@
+- name: Install SQLDBA databse
+  win_shell: |
+   $Qry = "IF  EXISTS (SELECT name FROM sys.databases WHERE name = N'SQLDBA')
+       ALTER DATABASE [SQLDBA] SET  SINGLE_USER WITH ROLLBACK IMMEDIATE "
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "IF  EXISTS (SELECT name FROM sys.databases WHERE name = N'SQLDBA')
+        DROP DATABASE [SQLDBA]"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "RESTORE DATABASE [SQLDBA]
+        FROM  DISK = N'D:\Install\SQL-CFG\SQLDBA-062513-SQL2012-Gold.bak' 
+        WITH  FILE = 1,
+        MOVE N'SQLDBA' TO N'{{ DataPath }}MSSQL\Data\SQLDBA_Data.mdf',
+        MOVE N'SQLDBA_log' TO N'{{ LogPath }}MSSQL\Logs\SQLDBA_log.ldf', 
+        NOUNLOAD,  REPLACE,  STATS = 5"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "TRUNCATE TABLE [SQLDBA].[dbo].[AuditErrors]
+            TRUNCATE TABLE [SQLDBA].[dbo].[AuditErrors1]
+            TRUNCATE TABLE [SQLDBA].[dbo].[CheckDbAudit]
+            TRUNCATE TABLE [SQLDBA].[dbo].[CommandLog]
+            TRUNCATE TABLE [SQLDBA].[dbo].[CompressDb]
+            TRUNCATE TABLE [SQLDBA].[dbo].[DiskMtr]
+            TRUNCATE TABLE [SQLDBA].[dbo].[Optimization]
+            TRUNCATE TABLE [SQLDBA].[dbo].[Parameters]"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "EXEC [SQLDBA].sys.sp_addextendedproperty @name=N'App Owner', @value=N'DC - SQL Database'
+            EXEC [SQLDBA].sys.sp_addextendedproperty @name=N'Application', @value=N'SQL Management Database' 
+            EXEC [SQLDBA].sys.sp_addextendedproperty @name=N'Primary Technical Contact (PTC)', @value=N'Stevenson, William' 
+            EXEC [SQLDBA].sys.sp_addextendedproperty @name=N'PTC Email', @value=N'William.Stevenson@charter.com' 
+            EXEC [SQLDBA].sys.sp_addextendedproperty @name=N'Secondary Technical Contact (STC)', @value=N'Aluri, Sahithi' 
+            EXEC [SQLDBA].sys.sp_addextendedproperty @name=N'STC Email', @value=N'Sahithi.Aluri@charter.com' 
+            EXEC [SQLDBA].sys.sp_addextendedproperty @name=N'Application Distribution List', @value=N'DLCorpIT-SQLServerAdmins@charter.com'"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    If ("{{ SqlVersion }}" -eq "2012") {$Qry = 'ALTER DATABASE [SQLDBA] SET COMPATIBILITY_LEVEL = 110'}
+    If ("{{ SqlVersion }}" -eq "2014") {$Qry = 'ALTER DATABASE [SQLDBA] SET COMPATIBILITY_LEVEL = 120'}
+    If ("{{ SqlVersion }}" -eq "2016") {$Qry = 'ALTER DATABASE [SQLDBA] SET COMPATIBILITY_LEVEL = 130'}
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"

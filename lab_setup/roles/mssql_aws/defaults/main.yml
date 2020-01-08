@@ -1,0 +1,4 @@
+---
+# defaults file for mssql_aws
+target_aws_region: us-east-2
+win_role: ""

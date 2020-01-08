@@ -1,0 +1,43 @@
+---
+
+- include_vars: secrets.yml
+  no_log: true
+
+- name: upgrade oracle
+  become: yes
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  shell: |
+    nohup dbua -silent -sid {{ oracle_db_name }} -oracleHome {{ current_oracle_home }} -sysDBAUserName sys -sysDBAPassword {{ oracle_db_syspass }} -recompile_invalid_objects true -degree_of_parallelism 4 {{ rac_flag }} 2>{{ oracle_tmp }}/db_upgrade_stderr.err >{{ oracle_tmp }}/db_upgrade_stdout.out &
+    sleep 30
+    while true
+    do
+      c=$(ps -ef | grep -v grep | grep dbua | grep {{ oracle_db_name }} | grep java | wc -l)
+      [ $c -eq 0 ] && break
+      sleep 10
+    done
+  args:
+    executable: /bin/bash
+  no_log: true
+  register: oracle_upgrade
+
+- name: Protected Output - upgrade oracle
+  debug:
+    var: "oracle_upgrade | combine({'cmd': oracle_upgrade.cmd | replace(oracle_db_syspass, '<PASSWORD HIDDEN>')})"
+
+- name: get upgrade logfile
+  find:
+    paths: "{{ oracle_base }}/cfgtoollogs/dbua/logs"
+    file_type: file
+    age: -10m
+    age_stamp: mtime
+    patterns: silent.log_*
+  register: upgrade_log_file
+
+- import_role:
+    name: oracle_api_services
+    tasks_from: upload_log.yml
+  vars:
+    logfile_path: "{{ upgrade_log_file.files[0].path }}"
+  tags:
+  - apex_api

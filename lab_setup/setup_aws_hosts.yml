@@ -1,0 +1,9 @@
+---
+- name: create aws vm's
+  hosts: "{{ host }}"
+  gather_facts: false
+  connection: local
+  roles:
+    - role: aws_vms
+  tasks:
+    - meta: refresh_inventory

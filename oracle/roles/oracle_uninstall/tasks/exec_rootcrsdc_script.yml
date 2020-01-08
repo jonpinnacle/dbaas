@@ -1,0 +1,23 @@
+---
+
+- name: execute crsdc.run
+  command: "{{ script_path }}/crsdc.run"
+  args:
+    removes: "{{ oracle_home }}"
+  ignore_errors: yes
+  failed_when: "'successfully deconfigured' not in crsdc_run_script.stdout"
+  register: crsdc_run_script
+
+- name: save crsdc_run_script stdout
+  copy:
+    dest: "{{ oracle_tmp }}/rootdeinstall_script.out"
+    content: "{{ crsdc_run_script.stdout }}"
+  when: crsdc_run_script.changed
+
+- name: save crsdc_run_script stderr
+  copy:
+    dest: "{{ oracle_tmp }}/crsdc_run_script.err"
+    content: "{{ crsdc_run_script.stderr }}" 
+  when: 
+  - crsdc_run_script.changed
+  - crsdc_run_script.stderr_lines | length > 0

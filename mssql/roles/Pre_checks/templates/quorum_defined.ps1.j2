@@ -1,0 +1,2 @@
+Import-Module FailoverClusters
+get-clusterresource  | where-object {$_.Name -like 'Cluster IP Address'}

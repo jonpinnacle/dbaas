@@ -1,0 +1,6 @@
+spool {{ oracle_tmp }}/mount_{{ diskgroup.name }}.out;
+
+alter diskgroup {{ diskgroup.name }} mount all;
+
+spool off;
+EXIT;

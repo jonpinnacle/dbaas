@@ -1,0 +1,37 @@
+---
+- name: create the grid installer directory to the oracle user
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}/grid"
+    state: directory
+
+- name: create the path to store the grid files
+  file:
+    path: "{{ oracle_installer_path }}/GRID/{{ grid_version }}"
+    state: directory
+    recurse: yes
+
+- name: get grid installer files from S3
+  aws_s3:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    bucket: gfcloudsoftwarerepo
+    object: "ORACLE_DB/GRID/{{ grid_zipfile }}"
+    dest: "{{ oracle_installer_path }}/GRID/{{ grid_version }}/{{ grid_zipfile }}"
+    mode: get
+  loop: "{{ grid_images }}"
+  loop_control:
+    loop_var: grid_zipfile
+
+- name: unzip grid installer
+  unarchive:
+    src: "{{ oracle_installer_path }}/GRID/{{ grid_version }}/{{ grid_zipfile }}"
+    dest: "{{ oracle_tmp }}"
+    remote_src: yes
+    keep_newer: true
+    validate_certs: no
+  when: inventory_hostname == master_node
+  loop: "{{ grid_images }}"
+  loop_control:
+    loop_var: grid_zipfile

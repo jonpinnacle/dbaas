@@ -1,0 +1,35 @@
+---
+
+- name: show adrci homes
+  become: yes
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  shell: adrci exec="SHOW HOMES"
+  changed_when: False
+  register: adrci_homes
+
+- name: make adrci script from jinja template
+  become: yes
+  become_user: '{{ oracle_user }}'
+  template:
+    src: adrci_setup.j2
+    dest: "{{ oracle_base }}/adrci_setup.txt"
+
+- name: run adrci script
+  become: yes
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  shell: "adrci script={{ oracle_base }}/adrci_setup.txt"
+  register: adrci_script_output
+
+- name: save output of adrci
+  copy:
+    dest: "{{ oracle_tmp }}/adrci_setup_db.out"
+    content: "adrci_script_output.stdout"
+
+- name: save error of adrci
+  copy:
+    dest: "{{ oracle_tmp }}/adrci_stderr_db.err"
+    content: "{{ adrci_script_output.stderr }}"
+  changed_when: False
+  when: adrci_script_output.stderr_lines | length > 0

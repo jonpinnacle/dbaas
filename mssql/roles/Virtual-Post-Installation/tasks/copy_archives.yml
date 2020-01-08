@@ -1,0 +1,23 @@
+---
+- win_get_url:
+    url: '{{ bin_server }}\{{ item }}'
+    dest: "{{ ansible_tmp }}"
+    validate_certs: no
+    force: no
+  loop:
+  - IseriesDriver.zip
+  - Oracle Client.zip
+  - SQL{{ SqlVersion }}.zip
+  - SQL-CFG.zip
+  - SQLServer2005_BC_x64.zip
+
+- win_unzip:
+    src: '{{ ansible_tmp }}\{{ item }}'
+    dest: '{{ installer_location }}'
+    delete_archive: yes
+  loop:
+  - IseriesDriver.zip
+  - Oracle Client.zip
+  - SQL{{ SqlVersion }}.zip
+  - SQL-CFG.zip
+  - SQLServer2005_BC_x64.zip

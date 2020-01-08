@@ -1,0 +1,42 @@
+---
+- name: create the instance
+  ec2_instance:
+    name: "{{ inventory_hostname }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    launch_template:
+      id: "{{ aws_template }}"
+    key_name: gf_keys
+    instance_type: t2.large
+    state: running
+    termination_protection: no
+    network:
+      assign_public_ip: true
+    security_groups:
+      - sg-01122dcc44993b4e8
+      - sg-0cad5807e6eb827f0
+    vpc_subnet_id: subnet-0e0e440d3239d85c7
+  register: aws_instance_result
+
+- name: Add tower host
+  tower_host:
+    tower_host: "{{ awx_uri }}"
+    tower_username: "{{ awx_vm_user }}"
+    tower_password: "{{ tower_pass }}"
+    name: "{{ inventory_hostname }}"
+    description: "{{ inventory_hostname }}"
+    inventory: "Integration-INV"
+    state: present
+    variables:
+      ansible_host: "{{ aws_instance_result.instances[0].public_dns_name }}"
+      aws_id: "{{ aws_instance_result.instances[0].instance_id}}"
+      ansible_user: clckwrk
+
+- name: show instance results
+  debug:
+    msg: "{{ inventory_hostname }} \n
+          {{ aws_instance_result.instances[0].public_dns_name }} \n
+          {{ aws_instance_result.instances[0].private_ip_address }} \n
+          {{ aws_instance_result.instances[0].public_ip_address }} \n
+          {{ aws_instance_result.instances[0].instance_id}}"

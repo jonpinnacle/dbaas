@@ -1,0 +1,19 @@
+
+crs_type: "{%- if ansible_play_hosts | length > 1 -%}crs
+           {%- else -%}has
+           {%- endif %}"
+           
+patch_num: "{{ ojvm_patch | regex_replace('p([0-9]*)_.*','\\1') }}"
+
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ oracle_sid | default('') }}"
+  ORACLE_UNQNAME: "{{ oracle_db_name }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ oracle_home }}/bin:{{ oracle_tmp }}/{{ ojvm_patch }}:{{ oracle_home }}/OPatch:{{ ansible_env.PATH }}"
+  TMP: "/u01/app/oracle"
+  TMPDIR: "/u01/app/oracle"  
+  
+ojvm_failures: []
+datapatch_failures: []

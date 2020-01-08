@@ -1,0 +1,63 @@
+:setvar PrimaryReplica {{ PrimaryReplica }}
+:setvar SecondaryReplica {{ SecondaryReplica }}
+:setvar EndPointPort {{ EndPointPort }}
+:setvar AvailabilityGroup {{ AvailabilityGroup }}
+:setvar Listener {{ Listener }}
+:setvar IPListener {{ IPListener }}
+:setvar ListenerPort {{ ListenerPort }}
+:setvar ListenerSubnet {{ ListenerSubnet }}
+
+:Connect $(PrimaryReplica)
+ 
+USE [master]
+GO
+ 
+DECLARE @SystemAddressPrimary NVARCHAR(256)
+DECLARE @SystemAddressSecondary NVARCHAR(256)
+ 
+IF CHARINDEX('','$(PrimaryReplica)')=0
+ SET @SystemAddressPrimary='$(PrimaryReplica)'
+ELSE
+ SELECT @SystemAddressPrimary=SUBSTRING('$(PrimaryReplica)',0,CHARINDEX('','$(PrimaryReplica)'))
+ 
+IF CHARINDEX('','$(SecondaryReplica)')=0
+ SET @SystemAddressSecondary='$(SecondaryReplica)'
+ELSE
+ SELECT @SystemAddressSecondary=SUBSTRING('$(SecondaryReplica)',0,CHARINDEX('','$(SecondaryReplica)'))
+ 
+DECLARE @CMD NVARCHAR(MAX)
+
+SET @CMD = 'ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ MODIFY REPLICA ON
+N''$(PrimaryReplica)'' WITH 
+(SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ MODIFY REPLICA ON
+N''$(PrimaryReplica)'' WITH 
+(SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N''TCP://' + @SystemAddressPrimary + '.CORP.CHARTERCOM.COM:$(ListenerPort)''));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ MODIFY REPLICA ON
+N''$(SecondaryReplica)'' WITH 
+(SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ MODIFY REPLICA ON
+N''$(SecondaryReplica)'' WITH 
+(SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N''TCP://' + @SystemAddressSecondary + '.CORP.CHARTERCOM.COM:$(ListenerPort)''));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+MODIFY REPLICA ON
+N''$(PrimaryReplica)'' WITH 
+(PRIMARY_ROLE (READ_ONLY_ROUTING_LIST=(N''$(SecondaryReplica)'',N''$(PrimaryReplica)'')));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+MODIFY REPLICA ON
+N''$(SecondaryReplica)'' WITH 
+(PRIMARY_ROLE (READ_ONLY_ROUTING_LIST=(N''$(PrimaryReplica)'',N''$(SecondaryReplica)'')));'
+
+--PRINT @CMD
+EXEC sp_executesql @CMD
+ 
+GO

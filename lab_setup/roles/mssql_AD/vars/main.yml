@@ -1,0 +1,4 @@
+---
+# vars file for mssql_AD
+dns_name: ad.getfamiliar.com
+safe_mode_password: '{{ vault_password }}'

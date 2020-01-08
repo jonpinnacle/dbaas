@@ -1,0 +1,9 @@
+$inlocaladmin = $null;
+$u = "{{ DBA_AD_GROUP }}";
+$inlocaladmin =  net localgroup administrators | Where {$_ -match $u};
+if ($inlocaladmin -eq $null)
+    {write-host "Failure: DBA group not in Administrator group"
+    }
+else
+    {write-host "Success: DBA group is in Administrator group"
+    }

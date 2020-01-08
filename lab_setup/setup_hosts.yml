@@ -1,0 +1,15 @@
+---
+- name: create vm's
+  hosts: "{{ host }}"
+  gather_facts: false
+  connection: local
+  tasks:
+    - import_role:
+        name: aws_vms
+      when: dc_location == 'AWS'
+      
+    - import_role:
+        name: ocp_vms
+      when: dc_location != 'AWS'
+
+    - meta: refresh_inventory

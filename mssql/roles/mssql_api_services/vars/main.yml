@@ -1,0 +1,5 @@
+---
+
+apex_url: https://apex.techlab.com:8443/ords/invent2/charter
+
+json_backup_dir: /apex/unsent_json_body/{{ ansible_hostname }}

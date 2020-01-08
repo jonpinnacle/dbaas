@@ -1,0 +1,143 @@
+---
+- name: install oracle
+  environment: "{{ ora_user_env }}"
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: |
+    nohup {{ oracle_tmp }}/database/runInstaller -ignoreSysPrereqs -ignorePrereq -waitforcompletion -showProgress -silent -force -responseFile {{ oracle_tmp }}/db_install.rsp 2>&1 | tee {{ oracle_tmp }}/db_stdout.out &
+    sleep 30
+    while true
+    do
+      c=$(ps -ef | grep -v grep | grep db_install.rsp | grep java | wc -l)
+      [ $c -eq 0 ] && break
+      sleep 10
+    done
+  args:
+    executable: /bin/bash
+    creates: "{{ oracle_home }}/bin/sqlplus"
+  register: db_install
+  failed_when: '"[FATAL]" in db_install.stdout'
+  ignore_errors: yes
+  when: inventory_hostname == master_node
+
+# log file location is in /u01/app/oraInventory/logs/installActions2018-08-24_06-30-14AM.log
+- name: Get files in a folder
+  find:
+    paths: "{{ install_base }}/oraInventory/logs/"
+    patterns: "installActions*.log"
+  register: log_files
+
+# - name: Upload logs for RDBMS Installation
+#   include_tasks: upload_log.yml
+#   vars:
+#     logfile_path: "{{ log_files.files | sort(attribute='mtime',reverse=true) | first | json_query('path') }}"
+#     log_file_desc: InstallAction
+#   tags:
+#   - apex_api
+
+- name: db checklist status file upload for RDBMS Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status_file.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "RDBMS Software Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload RDBMS Install Log"
+    task_message: "RDBMS Install Log {{ ansible_hostname }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    standard_task_id: "{{ standard_task_id }}"
+    logfile_path:  "{{ log_files.files | sort(attribute='mtime',reverse=true) | first | json_query('path') }}"
+  when: inventory_hostname == master_node
+  tags:
+  - apex_api
+
+- name: db checklist status post for RDBMS Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "RDBMS Software Install"
+    task_id: "{{ ticket_ref }}"
+    standard_task_id: "{{ standard_task_id }}"
+    task_status: "IN_PROGRESS"
+    task_message: "Executing ROOT.sh for INSTALL RDBMS Software on {{ ansible_hostname }} "
+  tags:
+  - apex_api
+
+# - name: host checklist post update for RDBMS
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       #ID: "{{ checklist_id }}"
+#       db_name:  "{{ oracle_db_name }}"
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: "RDBMS Software Install"
+#       checklist_category: Install
+#       task_desc: Root.sh execution RDBMS
+#       db_install_status: IN PROGRESS
+#   tags:
+#   - apex_api
+
+
+- block:
+  - name: general oracle post-installation
+    command: "{{ install_base }}/oraInventory/orainstRoot.sh"
+    when: 'install_base + "/oraInventory/orainstRoot.sh" in hostvars[master_node]["db_install"]["stdout"]'
+
+  - include_tasks: execute_root_script.yml
+    loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+    loop_control:
+      loop_var: curr_host
+    tags: root_script
+    when:
+    - 'oracle_home + "/root.sh" in hostvars[master_node]["db_install"]["stdout"]'
+    - inventory_hostname == curr_host
+  when:
+  - hostvars[master_node]["db_install"]["changed"]
+  - hostvars[master_node]['db_install']['failed'] is not defined or not hostvars[master_node]['db_install']['failed']
+
+# - name: host checklist post update for RDBMS Install
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: True
+#       #ID: "{{ checklist_id }}"
+#       db_name:  "{{ oracle_db_name }}"
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: "RDBMS Software Install"
+#       checklist_category: Install
+#       task_desc: RDBMS INSTALL
+#       db_install_status: "{% if hostvars[master_node]['db_install']['failed'] is defined and
+#                                  hostvars[master_node]['db_install']['failed'] -%}FAILED
+#                           {%- else -%}SUCCESSFUL
+#                           {%- endif -%}"
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for RDBMS Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "RDBMS Software Install"
+    standard_task_id: "{{ standard_task_id }}"
+    task_id: "{{ ticket_ref }}"
+    task_status: "{% if hostvars[master_node]['db_install']['failed'] is defined and
+                        hostvars[master_node]['db_install']['failed'] -%}FAILED
+                  {%- else -%}SUCCESSFUL
+                  {%- endif -%}"
+    task_message: "Install RDBMS Software for {{ ansible_hostname }} "
+  tags:
+  - apex_api
+
+- name: Install Failed
+  fail:
+    msg: RDBMS Install Failed
+  when:
+  - hostvars[master_node]['db_install']['failed'] is defined
+  - hostvars[master_node]['db_install']['failed']

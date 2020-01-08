@@ -1,0 +1,41 @@
+---
+- name: Create Directory-Source
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ source_user_env }}"
+  block:
+  - name: Copy the create-directory.sql file-Source
+    template: 
+      src: create-directory.j2
+      dest: "{{ oracle_tmp }}/create-directory.sql"
+
+  - name: run create-directory.sql script-Source
+    command: "sqlplus / as sysdba @{{ oracle_tmp }}/create-directory.sql"
+    register: opt1
+    failed_when: '"ERROR" in opt1.stdout'
+  when: inventory_hostname == master_node
+
+- name: create tmp dir
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ source_user_env }}"
+  file:
+    mode: 0755
+    path: "{{ directory_name }}"
+    state: directory
+
+- name: run source database to export the FULL database
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ source_user_env }}"
+  shell: expdp "'/ as sysdba'" directory={{ directory_name }} dumpfile={{ export_filename }}.dmp full=y logfile={{ logfile_name }}.log
+  when: inventory_hostname == master_node
+
+- include_tasks: scp_dmp.yml
+  when: HOST_COUNT == "2"
+
+- include_tasks: import_dmp_target.yml
+  when: HOST_COUNT == "2"
+
+- include_tasks: import_dmp_samenode.yml
+  when: HOST_COUNT == "1"

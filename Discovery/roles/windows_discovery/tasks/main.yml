@@ -1,0 +1,13 @@
+---
+# tasks file for windows_discovery
+- name: Get ansible facts
+  setup_mod:
+
+- name: Get disk facts
+  win_disk_facts:
+
+- name: Template a json file.
+  template:
+    src: windows_discovery.j2
+    dest: "/tmp/{{ inventory_hostname }}.json"
+  delegate_to: localhost

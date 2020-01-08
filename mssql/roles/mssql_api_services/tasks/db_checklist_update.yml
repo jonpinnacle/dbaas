@@ -1,0 +1,18 @@
+- import_tasks: db_checklist_insertion.yml
+  vars:
+    mssql_db_name: "{{ mssql_db_name }}"
+  when: inventory_hostname == master_node and db_chklst_json_body.new_entry
+
+- name: update the json data using PUT call
+  win_uri:
+    url:  "{{ apex_url }}/mssql_check_list/{{ checklist_id }}"
+    validate_certs: no  # should be removed after https certs becomes renewed
+    method: PUT
+    body_format: json
+    body: "{{ db_chklst_json_body }}"
+    headers:
+        Content-Type: "application/json"
+  when:
+  - inventory_hostname == master_node 
+  - checklist_id is defined
+  - checklist_id != ""

@@ -1,0 +1,200 @@
+:setvar PrimaryReplica {{ PrimaryReplica }}
+:setvar SecondaryReplica {{ SecondaryReplica }}
+:setvar EndPointPort {{ EndPointPort }}
+:setvar AvailabilityGroup {{ AvailabilityGroup }}
+:setvar Listener {{ Listener }}
+:setvar IPListener {{ IPListener }}
+:setvar ListenerPort {{ ListenerPort }}
+:setvar ListenerSubnet {{ ListenerSubnet }}
+ 
+:Connect $(PrimaryReplica)
+ 
+USE [master]
+GO
+declare @AVGLogin as sysname
+declare @CMD nvarchar(max)
+ 
+select @AVGLogin=service_account from sys.dm_server_services
+where servicename like 'SQL Server (%'
+ 
+if not exists(select name from sys.syslogins where name=@AVGLogin)
+begin
+ set @CMD=N'CREATE LOGIN [' + @AVGLogin + '] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]'
+ print 'Create service account as server login...'
+ exec sp_executesql @CMD
+end
+ 
+if not exists (select name from sys.endpoints where name='Hadr_endpoint')
+begin
+print 'Create HA/DR endpoint...'
+CREATE ENDPOINT [Hadr_endpoint] 
+ AS TCP (LISTENER_PORT = $(EndPointPort))
+ FOR DATA_MIRRORING (ROLE = ALL, ENCRYPTION = REQUIRED ALGORITHM AES)
+end
+ 
+IF (SELECT state FROM sys.endpoints WHERE name = N'Hadr_endpoint') <> 0
+BEGIN
+ ALTER ENDPOINT [Hadr_endpoint] STATE = STARTED
+END
+ 
+ 
+set @CMD=N'GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [' + @AVGLogin + ']'
+print 'GRANT CONNECT ON ENDPOINT...'
+exec sp_executesql @CMD
+ 
+GO
+ 
+:Connect $(SecondaryReplica)
+ 
+USE [master]
+GO
+ 
+declare @AVGLogin as sysname
+declare @CMD nvarchar(max)
+ 
+select @AVGLogin=service_account from sys.dm_server_services
+where servicename like 'SQL Server (%'
+ 
+if not exists(select name from syslogins where name=@AVGLogin)
+begin
+ set @CMD=N'CREATE LOGIN [' + @AVGLogin + '] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]'
+ print 'Create service account as server login...'
+ exec sp_executesql @CMD
+end
+ 
+if not exists (select name from sys.endpoints where name='Hadr_endpoint')
+begin
+print 'Create HA/DR endpoint...'
+CREATE ENDPOINT [Hadr_endpoint] 
+ AS TCP (LISTENER_PORT = $(EndPointPort))
+ FOR DATA_MIRRORING (ROLE = ALL, ENCRYPTION = REQUIRED ALGORITHM AES)
+end
+ 
+IF (SELECT state FROM sys.endpoints WHERE name = N'Hadr_endpoint') <> 0
+BEGIN
+ ALTER ENDPOINT [Hadr_endpoint] STATE = STARTED
+END
+ 
+set @CMD=N'GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [' + @AVGLogin + ']'
+print 'GRANT CONNECT ON ENDPOINT...'
+exec sp_executesql @CMD
+ 
+GO
+ 
+:Connect $(PrimaryReplica)
+ 
+IF EXISTS(SELECT * FROM sys.server_event_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER WITH (STARTUP_STATE=ON);
+END
+IF NOT EXISTS(SELECT * FROM sys.dm_xe_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER STATE=START;
+END
+ 
+GO
+ 
+:Connect $(SecondaryReplica)
+ 
+IF EXISTS(SELECT * FROM sys.server_event_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER WITH (STARTUP_STATE=ON);
+END
+IF NOT EXISTS(SELECT * FROM sys.dm_xe_sessions WHERE name='AlwaysOn_health')
+BEGIN
+ ALTER EVENT SESSION [AlwaysOn_health] ON SERVER STATE=START;
+END
+ 
+GO
+ 
+:Connect $(PrimaryReplica)
+ 
+USE [master]
+GO
+ 
+declare @SystemAddressPrimary nvarchar(256)
+declare @SystemAddressSecondary nvarchar(256)
+ 
+if charindex('','$(PrimaryReplica)')=0
+ set @SystemAddressPrimary='$(PrimaryReplica)'
+else
+ select @SystemAddressPrimary=substring('$(PrimaryReplica)',0,charindex('','$(PrimaryReplica)'))
+ 
+if charindex('','$(SecondaryReplica)')=0
+ set @SystemAddressSecondary='$(SecondaryReplica)'
+else
+ select @SystemAddressSecondary=substring('$(SecondaryReplica)',0,charindex('','$(SecondaryReplica)'))
+ 
+declare @CMD nvarchar(max)
+set @CMD='CREATE AVAILABILITY GROUP [$(AvailabilityGroup)] WITH (AUTOMATED_BACKUP_PREFERENCE = PRIMARY) FOR REPLICA ON N''$(PrimaryReplica)'' WITH (ENDPOINT_URL = N''TCP://' + @SystemAddressPrimary + ':$(EndPointPort)'', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = READ_ONLY)), N''$(SecondaryReplica)'' WITH (ENDPOINT_URL = N''TCP://' + @SystemAddressSecondary + ':$(EndPointPort)'', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SECONDARY_ROLE(ALLOW_CONNECTIONS = READ_ONLY));' 
+print 'Create the availability group...'
+exec sp_executesql @CMD
+ 
+print 'Create the availability group listener...'
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ADD LISTENER N'$(Listener)' (
+WITH IP
+((N'$(IPListener)', N'$(ListenerSubnet)')
+)
+, PORT=$(ListenerPort));
+ 
+GO
+ 
+:Connect $(SecondaryReplica)
+ 
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)] JOIN;
+ 
+GO
+
+:Connect $(PrimaryReplica)
+ 
+USE [master]
+GO
+ 
+DECLARE @SystemAddressPrimary NVARCHAR(256)
+DECLARE @SystemAddressSecondary NVARCHAR(256)
+ 
+IF CHARINDEX('','$(PrimaryReplica)')=0
+ SET @SystemAddressPrimary='$(PrimaryReplica)'
+ELSE
+ SELECT @SystemAddressPrimary=SUBSTRING('$(PrimaryReplica)',0,CHARINDEX('','$(PrimaryReplica)'))
+ 
+IF CHARINDEX('','$(SecondaryReplica)')=0
+ SET @SystemAddressSecondary='$(SecondaryReplica)'
+ELSE
+ SELECT @SystemAddressSecondary=SUBSTRING('$(SecondaryReplica)',0,CHARINDEX('','$(SecondaryReplica)'))
+ 
+DECLARE @CMD NVARCHAR(MAX)
+
+SET @CMD = 'ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ MODIFY REPLICA ON
+N''$(PrimaryReplica)'' WITH 
+(SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ MODIFY REPLICA ON
+N''$(PrimaryReplica)'' WITH 
+(SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N''TCP://' + @SystemAddressPrimary + '.CORP.CHARTERCOM.COM:$(ListenerPort)''));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ MODIFY REPLICA ON
+N''$(SecondaryReplica)'' WITH 
+(SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+ MODIFY REPLICA ON
+N''$(SecondaryReplica)'' WITH 
+(SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N''TCP://' + @SystemAddressSecondary + '.CORP.CHARTERCOM.COM:$(ListenerPort)''));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+MODIFY REPLICA ON
+N''$(PrimaryReplica)'' WITH 
+(PRIMARY_ROLE (READ_ONLY_ROUTING_LIST=(N''$(SecondaryReplica)'',N''$(PrimaryReplica)'')));
+
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)]
+MODIFY REPLICA ON
+N''$(SecondaryReplica)'' WITH 
+(PRIMARY_ROLE (READ_ONLY_ROUTING_LIST=(N''$(PrimaryReplica)'',N''$(SecondaryReplica)'')));'
+
+--PRINT @CMD
+EXEC sp_executesql @CMD

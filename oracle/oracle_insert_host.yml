@@ -1,0 +1,8 @@
+---
+- name: insert host
+  hosts: '{{ host }}'
+  become: yes
+  vars:
+    catalog_dest_type: HOST_CATALOG_TBL
+  roles:
+  - oracle_catalog

@@ -1,0 +1,31 @@
+---
+
+- name: unzip GoldenGate installer
+  unarchive: 
+    src: "{{ gg_installer }}" 
+    dest: "{{ oracle_tmp }}"
+    creates: "{{ gg_install_dir }}/runInstaller"
+    remote_src: yes 
+    keep_newer: true
+    validate_certs: no
+
+- name: create RSP file
+  template:
+    dest: "{{ oracle_tmp }}/gg_install.rsp"
+    src: gg_install.rsp.j2
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+
+- name: execute GG runInstaller
+  become_user: "{{ oracle_user}}"
+  environment: "{{ ora_user_env }}"
+  shell: |
+      nohup {{ gg_install_dir }}/runInstaller -silent -responseFile {{ oracle_tmp }}/gg_install.rsp 2>&1 | tee {{ oracle_tmp }}/gg_install.out &
+      sleep 30
+      while true
+      do 
+        c=$(ps -ef | grep -v grep | grep gg_install.rsp | grep java | wc -l)
+        [ $c -eq 0 ] && break
+        sleep 10
+      done
+  register: gg_install

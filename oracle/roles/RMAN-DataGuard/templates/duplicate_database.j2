@@ -1,0 +1,1 @@
+duplicate database for standby from active database dorecover spfile set db_unique_name = '{{ target_db }}' comment 'Is a standby' set fal_server='{{ source_db }}' comment 'Is primary' nofilenamecheck;

@@ -1,0 +1,15 @@
+---
+
+- name: GET host_code from APEX
+  win_uri:
+    url: "{{ apex_url }}/get_host_code/{{ ansible_hostname | lower }}"
+    validate_certs: no  # should be removed after https certs becomes renewed
+    return_content: yes
+    method: GET
+  ignore_errors: yes
+  register: host_code_get_response
+
+- name: set host_code
+  set_fact:
+    host_code: "{{ host_code_get_response.json | default('{`items`:[{`host_code`:``}]}') | json_query('items[0].host_code') }}"
+  when: host_code_get_response.json  | default('{`items`:[{`host_code`:``}]}') | json_query('items[0].host_code') != ""

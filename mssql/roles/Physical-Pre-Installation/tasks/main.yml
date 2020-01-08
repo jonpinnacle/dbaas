@@ -1,0 +1,175 @@
+---
+- name: Create Ansible Log and Temp  Directory
+  win_file:
+    path: "{{ ansible_directory }}"
+    state: directory
+  loop:
+  - "{{ ansible_tmp }}"
+  - C:\Ansible\Logs
+  loop_control:
+    loop_var: ansible_directory
+
+- include_vars: Physical-Secrets.yml
+  no_log: true
+
+- name: add ProtectionPolicy into registry
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Cryptography\Protect\Providers\df9d8cd0-1501-11d1-8c7a-00c04fc297eb
+    name: ProtectionPolicy
+    data: 1
+    type: dword
+
+- name: Turn Off Smartscreen
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer
+    name: SmartScreenEnabled
+    type: string
+    data: Off
+  tags:
+  - regedit
+
+- name: Get Disk facts
+  win_disk_facts:
+
+- name: initialize disk
+  win_shell: "Initialize-Disk -Number {{ item.number }}"
+  with_items: "{{ win_disks }}"
+  when: ansible_disks[item.number].guid is none
+
+- name: Create drive letters
+  win_shell: "New-Partition -DiskNumber {{ item.number }} -AssignDriveLetter -UseMaximumSize"
+  with_items: "{{ win_disks }}"
+  when: ansible_disks[item.number].guid is none
+
+- name: format disk
+  win_shell: "Format-Volume -DriveLetter {{ item.letter }}"
+  with_items: "{{ win_disks }}"
+  when: ansible_disks[item.number].guid is none
+
+- name: Get Disk facts
+  win_disk_facts:
+
+- include_tasks: Check_free_space.yml
+  loop:
+    - { letter: D, min_size: 50000000}
+    - { letter: E, min_size: 10000000000}
+  loop_control:
+    loop_var: drive
+
+- name: Clean-up D drive
+  win_shell: Move-Item -Path {{ dir_obj.source }} -Destination {{ dir_obj.dest }} -Force
+  args:
+    removes: "{{ dir_obj.source }}"
+  loop:
+  - { source: 'D:\Create3NodeClusterModule.ps1',dest: 'D:\Install' }
+  - { source: 'D:\CreateClusterForAAGVariables3Node.ps1',dest: 'D:\Install' }
+  - { source: 'D:\WindowsFailoverClusterFeatureInstall3Node.ps1',dest: 'D:\Install' }
+  - { source: 'D:\CleanWipe',dest: 'D:\Install' }
+  - { source: 'D:\SEP_D_EXE',dest: 'D:\Install' }
+  - { source: 'D:\TWC_WIN-old',dest: 'D:\Install' }
+  - { source: 'D:\bn_routes.cmd',dest: 'D:\Install' }
+  - { source: 'D:\SEP_V_14',dest: 'D:\Install' }
+  - { source: 'D:\8.0',dest: 'D:\Install' }
+  - { source: 'D:\directsetup',dest: 'D:\Install' }
+  loop_control:
+    loop_var: dir_obj
+
+- include: Copy-and-import-Carbon-and-SQL-DBA-tools.yml
+
+- name: check os version
+  win_shell: "echo {{ ansible_distribution }}"
+  register: os
+
+- name: Install .net 3.5 on 2012
+  win_feature:
+    name: Net-Framework-Core
+    source: D:\Install\SQL-CFG\Win2012\sxs
+    include_management_tools: yes
+    state: present
+  when: '"2012" in os.stdout'
+
+- name: Install .net 3.5 on 2016
+  win_feature:
+    name: Net-Framework-Core
+    source: D:\Install\SQL-CFG\Win2016\sxs
+    include_management_tools: yes
+    state: present
+  when: '"2016" in os.stdout'
+
+- name: Enable the ability to map a network drive
+  win_regedit:
+    path: HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters
+    name: "{{ registry_name }}"
+    type: dword
+    data: 0
+  loop:
+  - RequireSecureNegotiate
+  - RequireSecuritySignature
+  loop_control:
+    loop_var: registry_name
+
+- name: Create desktop directory for interactive processes (MSFT SSIS fix)
+  win_file:
+    path: "{{ desktop_directory }}"
+    state: directory
+  loop:
+  - C:\Windows\SysWOW64\config\systemprofile\Desktop
+  - C:\Windows\system32\config\systemprofile\Desktop
+  loop_control:
+    loop_var: desktop_directory
+
+##################################################
+## Didn't see any modules for netsh             ##
+## may need to remain as a shell for now        ##
+##                                              ##
+## Possibly query for status then run if needed ##
+##################################################
+- name: Disable TCP Chimney
+  win_shell: |
+    netsh int tcp set global chimney=disabled
+    netsh int tcp set global rss=disabled
+    netsh int tcp show global
+
+- name: Set DisableTaskOffload to 1 (true)
+  win_regedit:
+    path: HKLM:\system\CurrentControlSet\Services\TCPIP\Parameters
+    name: DisableTaskOffload
+    type: dword
+    data: 1
+
+- name: Set Power Setting
+  win_power_plan:
+    name: high performance
+
+#############################################################################
+## win_firewall module requires WMF 5.1 or higher                          ##
+##                                                                         ##
+## For our lab (and as a Proof-of-Concept for Charter), I have created the ##
+## "Win_Update_PowerShell.yml" Playbook in the 'Technologent_lab' folder   ##
+## That playbook uses the `win_chocolatey` module to update PS to 5.1      ##
+#############################################################################
+- name: Disable Windows Frewall
+  win_firewall:
+    state: disabled
+    profiles:
+    - Domain
+    - Private
+    - Public
+
+#- include: Set-Windows-Security-for-SQL-service-Acct.yml
+
+#- include: Update-Configuration-File.yml
+
+- name: Create Paths
+  win_file:
+    path: "{{ curr_directory }}"
+    state: directory
+  loop:
+  - '{{ BuPath }}\Refresh'
+  - '{{ BuPath }}\MSSQL\Misc'
+  - '{{ BuPath }}\MSSQL\Backups\DRPrep'
+  - '{{ DataPath }}\MSSQL\Data'
+  - '{{ LogPath }}\MSSQL\Logs'
+  - '{{ TempdbPath }}\MSSQL\Data'
+  loop_control:
+    loop_var: curr_directory

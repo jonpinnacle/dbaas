@@ -1,0 +1,23 @@
+/u01/app/oracle/admin/logs:*.log:delete:none:30:0
+/u01/app/oracle/admin/logs/rman:*.log:delete:none:30:0
+/u01/app/oracle/admin/logs/archive:*.gz:delete:none:30:0
+/u01/app/oracle/diag/asm/+asm/{{ asm_sid }}/trace:alert_{{ asm_sid }}.log:archive:clear:7:100
+{{ oracle_grid_home }}/rdbms/audit:*.aud:delete:none:1:0
+{{ oracle_grid_home }}/log/{{ ansible_hostname }}/cssd:ocssd.l0*:delete:none:7:0
+{{ oracle_grid_home }}/log/{{ ansible_hostname }}/cssd:ocssd.l1*:delete:none:7:0
+{{ oracle_grid_home }}/log/{{ ansible_hostname }}/cssd:core*:delete:none:30:0
+{{ oracle_grid_home }}/log/{{ ansible_hostname }}/agent/crsd/scriptagent_oracle:scriptagent_oracle.l0*:delete:none:7:0
+{{ oracle_grid_home }}/log/{{ ansible_hostname }}/agent/crsd/oraagent_oracle:oraagent_oracle.l0*:delete:none:7:0
+{{ oracle_grid_home }}/log/{{ ansible_hostname }}/agent/ohasd/oraagent_oracle:oraagent_oracle.l0*:delete:none:7:0
+{{ oracle_grid_home }}/log/{{ ansible_hostname }}/gipcd:gipcd.l0*:delete:none:7:0
+{{ oracle_grid_home }}/log/{{ ansible_hostname }}/diskmon:diskmon.l0*:delete:none:7:0
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/listener_scan2/alert:*.xml:delete:none:30:0
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/listener_scan2/trace:*.log:archive:clear:30:100
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/listener_scan1/alert:*.xml:delete:none:30:0
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/listener_scan1/trace:*.log:archive:clear:30:100
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/listener_scan3/alert:*.xml:delete:none:30:0
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/listener_scan3/trace:*.log:archive:clear:30:100
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/listener/alert:*.xml:delete:none:30:0
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/listener/trace:*.log:archive:clear:30:100
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/mgmtlsnr/alert:*.xml:delete:none:30:0
+/u01/app/oracle/diag/tnslsnr/{{ ansible_hostname }}/mgmtlsnr/trace:*.log:archive:clear:30:100

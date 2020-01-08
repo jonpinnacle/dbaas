@@ -1,0 +1,63 @@
+---
+UName: "{%- if Domain == 'CHTR' -%}chtr\\svc_sqlmail
+        {%- elif Domain =='TWCCORP' -%}TWCCORP\\SVSQLPRD
+        {%- elif Domain =='TWCDMZ' -%}TWCDMZ\\SVSQLPRD
+        {%- elif Domain =='UAT' -%}UAT\\svc_sqlmail
+        {%- elif Domain =='DEV' -%}DEV\\svc_sqlmail
+        {%- elif Domain =='Corp' -%}CORP\\sqlman
+        {%- endif %}"
+
+# I didnt see the usage of "Env" in post script
+Env:   "{%- if Env1 == 'LAB' -%}L
+        {%- elif Env1 == 'DEV' -%}D
+        {%- elif Env1 == 'UAT' -%}U
+        {%- elif Env1 == 'TST' -%}T
+        {%- elif Env1 == 'QA' -%}Q
+        {%- elif Env1 == 'SIT' -%}S
+        {%- elif Env1 == 'DR' -%}R
+        {%- elif Env1 == 'PRD' -%}P
+        {%- endif %}"
+
+GName: "{%- if Env1 == 'LAB' -%}SQL {{ SqlVersion }} LAB
+        {%- elif Env1 == 'DEV' -%}SQL {{ SqlVersion }} DEV
+        {%- elif Env1 == 'UAT' -%}SQL {{ SqlVersion }} UAT
+        {%- elif Env1 == 'TST' -%}SQL {{ SqlVersion }} TST
+        {%- elif Env1 == 'QA' -%}SQL {{ SqlVersion }} QA
+        {%- elif Env1 == 'SIT' -%}SQL {{ SqlVersion }} SIT
+        {%- elif Env1 == 'DR' -%}SQL {{ SqlVersion }} PRD
+        {%- elif Env1 == 'PRD' -%}SQL {{ SqlVersion }} PRD
+        {%- endif %}"
+
+NewFile2: '{{ SystemPath }}\DBA\Scripts\{{ ansible_hostname }}-DBA_-_Collect_Inventory_Info.sql'
+
+######################################################################
+## Examples of using Ansible Host Facts to determine:               ##
+## - MaxMem                                                         ##
+## - MinMem                                                         ##
+## - MaxDop                                                         ##
+##                                                                  ##
+## However, since a win_shell is still needed to make the SQL call, ##
+## this doesn't really gain us much so I'm not using these for now. ##
+######################################################################
+MaxMem: "{{ (ansible_memtotal_mb * 0.8) | round | int }}"
+
+MinMem: "{{ ((ansible_memtotal_mb * 0.8) * 0.5) | round | int }}"
+
+MaxDop_full: '{{ ((ansible_processor_cores * ansible_processor_count) / 1.5 ) | round | int }}'
+
+MaxDop: "{% if MaxDop_full > '8' -%}8
+        {%- else -%}{{ MaxDop_full }}
+        {%- endif %}"
+
+######################################
+## The following Vars are found in  ##
+## vars/Physical-Secrets.yml        ##
+##                                  ##
+## FTP Server Details               ##
+##  - unc_password                  ##
+## local DB Sa password             ##
+##  - SaPw                          ##
+## SQL MGT Server Details           ##
+##  - password                      ##
+######################################
+

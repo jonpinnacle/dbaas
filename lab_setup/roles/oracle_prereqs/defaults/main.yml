@@ -1,0 +1,29 @@
+---
+
+oracle_version: 12.1.0.2
+
+oracle_base: /u01/app
+
+oracle_db_home: db_1 
+
+oracle_db_name: db
+
+oracle_pass: oracle123
+
+oracle_swap_file: "/swapfile"
+
+# Swap size in block_size, block_size=1024 * your_swap_file_size_in_mb
+oracle_swap_size: 524288 #512MB
+
+selinux_mode: permissive
+
+
+pbis:
+    ignored_users:
+        - root
+        - oracle
+    ignored_groups:
+        - tty
+        - root
+        - oinstall
+        - dba

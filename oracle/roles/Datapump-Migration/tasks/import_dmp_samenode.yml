@@ -1,0 +1,23 @@
+---
+- name: Create Directory
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ dest_user_env }}"
+  block:
+  - name: Copy the create-directory.sql file
+    template: 
+      src: create-directory.j2
+      dest: "{{ oracle_tmp }}/create-directory.sql"
+
+  - name: run create-directory.sql script-stand
+    command: "sqlplus / as sysdba @{{ oracle_tmp }}/create-directory.sql"
+    register: opt3
+    failed_when: '"ERROR" in opt3.stdout'
+  when: inventory_hostname == master_node
+
+- name: Import the FULL database
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ dest_user_env }}"
+  shell: impdp "'/ as sysdba'" directory={{ directory_name }} dumpfile={{ export_filename }}.dmp table_exists_action={{ table_exists_action }} logfile={{ logfile_name }}.log
+  when: inventory_hostname == master_node

@@ -1,0 +1,5 @@
+- name: install post Installation on mssql Physical Machine
+#  hosts: Physical-Windows
+  hosts: '{{ host }}'
+  roles:
+     - Physical-Post-Installation

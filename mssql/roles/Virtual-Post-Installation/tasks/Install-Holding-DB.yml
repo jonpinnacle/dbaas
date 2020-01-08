@@ -1,0 +1,21 @@
+- name: Install HOLDING databse    
+  win_shell: |
+    $Qry = "IF  EXISTS (SELECT name FROM sys.databases WHERE name = N'HOLDING') ALTER DATABASE [HOLDING] SET  SINGLE_USER WITH ROLLBACK IMMEDIATE "
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "IF  EXISTS (SELECT name FROM sys.databases WHERE name = N'HOLDING') DROP DATABASE [HOLDING]"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "CREATE DATABASE [HOLDING] ON  PRIMARY ( NAME = N'HOLDING_Data', FILENAME = N'{{ DataPath }}MSSQL\Data\HOLDING_Data.mdf' , SIZE = 5120KB , MAXSIZE = UNLIMITED, FILEGROWTH = 32MB) LOG ON ( NAME = N'HOLDING_Log', FILENAME = N'{{ LogPath }}MSSQL\Logs\HOLDING_Log.ldf' , SIZE = 5120KB , MAXSIZE = UNLIMITED, FILEGROWTH = 32MB)"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+    $Qry = "EXEC [HOLDING].sys.sp_addextendedproperty @name=N'App Owner', @value=N'DC - SQL Database' 
+            EXEC [HOLDING].sys.sp_addextendedproperty @name=N'Application', @value=N'SQL Management Database - Temp storage' 
+            EXEC [HOLDING].sys.sp_addextendedproperty @name=N'Primary Technical Contact (PTC)', @value=N'Stevenson, William' 
+            EXEC [HOLDING].sys.sp_addextendedproperty @name=N'PTC Email', @value=N'William.Stevenson@charter.com' 
+            EXEC [HOLDING].sys.sp_addextendedproperty @name=N'Secondary Technical Contact (STC)', @value=N'Aluri, Sahithi' 
+            EXEC [HOLDING].sys.sp_addextendedproperty @name=N'STC Email', @value=N'Sahithi.Aluri@charter.com' 
+            EXEC [HOLDING].sys.sp_addextendedproperty @name=N'Application Distribution List', @value=N'DLCorpIT-SQLServerAdmins@charter.com'"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+  

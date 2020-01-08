@@ -1,0 +1,29 @@
+---
+#AAG-Security-Cleanup Need AD account
+Login: "{{ EAG_ad_account }}"
+
+# UPDATE THE FOLLOWING SECTION WITH THE VALUES NEEDED FOR YOU AVAILABLITY GROUP
+# REPLACE THE xxx WITH PROPER VALUES
+
+#CreateEmptyAvailabilityGroup-2-Node-with-DR
+IPListener2: "{{ DR_listener }}" #Specify the IP Address of the group listener
+ListenerSubnet2: "{{ DR_subnet }}" #Specify the subnet of the listeren IP Address
+
+
+#CreateEmptyAvailabilityGroup-2-Node
+PrimaryReplica: "{{ EAG_PrimaryReplica }}" #Specify the primary replica
+SecondaryReplica: "{{ EAG_SecondaryReplica }}" #Specify the secondary replica
+EndPointPort: "{{EAG_endpoint }}" #Specify the port for the endpoints
+AvailabilityGroup: "{{ EAG_AvailabilityGroup }}" #Specify the name of the availability group
+Listener: "{{ EAG_group_listener }}" #Specify the name of the group listener
+IPListener: "{{ EAG_IPListener }}" #Specify the IP Address of the group listener
+ListenerPort: "{{ EAG_ListenerPort | default('1433') }}" # Specify the listener port
+ListenerSubnet: "{{ EAG_ListenerSubnet | default('255.255.255.0') }}" #Specify the subnet of the listeren IP Address
+
+username: "{{ EAG_username | default('admin') }}"
+
+#CreateEmptyAvailabilityGroup-3-Node
+DrReplica: "{{ DR_Replica }}" #Specify the Dr replica
+
+
+SQLInst: "{{ EAG_SQLInst | default('142.136.196.228') }}"

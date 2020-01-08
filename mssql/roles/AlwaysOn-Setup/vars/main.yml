@@ -1,0 +1,6 @@
+---
+master_node: "{{ ansible_play_hosts | first }}"
+
+node_count: "{{ ansible_play_hosts | length }}"
+
+dr_flag: true

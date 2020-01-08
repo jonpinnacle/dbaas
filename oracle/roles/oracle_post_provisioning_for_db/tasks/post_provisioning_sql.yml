@@ -1,0 +1,124 @@
+---
+- debug:
+    var: ora_user_env
+
+- name: Copy the pre check sql files to server
+  copy:
+    src: "{{ pre_check_sql }}"
+    dest: "{{ oracle_base }}/admin/scripts"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0755
+  loop: "{{ pre_check_sqls }}"
+  loop_control:
+    loop_var: pre_check_sql
+  changed_when: false
+
+- name: Running Script for AWR Snapshot interval
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: "sqlplus / as sysdba @{{ oracle_base }}/admin/scripts/awr_snapshot_interval.sql"
+  register: awr_snapshot_intervalresult
+  when: inventory_hostname == master_node
+
+- name: run pre_check_audit_purge.sql script
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: "sqlplus / as sysdba @{{ oracle_base }}/admin/scripts/pre_check_audit_purge.sql"
+  register: pre_check_audit_purge_result
+  failed_when: '"ERROR" in pre_check_audit_purge_result.stdout'
+
+- name: run setup_audit_purge.sql script
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: "sqlplus / as sysdba @{{ oracle_base }}/admin/scripts/setup_audit_purge.sql"
+  register: setup_audit_purge_result
+  failed_when: '"ERROR" in setup_audit_purge_result.stdout'
+  when: '"\t      1" not in pre_check_audit_purge_result.stdout_lines'
+
+- name: Copy the "Password_Verification_function.sql" to server
+  copy:
+    src: Password_Verification_function.sql
+    dest: "{{ oracle_base }}/admin/scripts"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0755
+
+- name: run Password_Verification_function.sql script
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: "sqlplus / as sysdba @{{ oracle_base }}/admin/scripts/Password_Verification_function.sql"
+  register: Password_Verification_function_result
+  failed_when: '"ORA-" in Password_Verification_function_result.stdout'
+
+- name: Copy the alter_default_profile.sql to server
+  copy:
+    src: alter_default_profile.sql
+    dest: "{{ oracle_base }}/admin/scripts"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0755
+
+- name: run alter_default_profile.sql script
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ oracle_base }}/admin/scripts/alter_default_profile.sql"
+  register: alter_default_profile_result
+  failed_when: '"ERROR" in alter_default_profile_result.stdout'
+
+- name: run pre_check_profile.sql script
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ oracle_base }}/admin/scripts/pre_check_profile.sql"
+  register: pre_check_profile_result
+  failed_when: '"ERROR" in pre_check_profile_result.stdout'
+
+- name: tasks to create profile
+  block:
+    - name: Copy the create_profiles.sql to server
+      copy:
+        src: create_profiles.sql
+        dest: "{{ oracle_base }}/admin/scripts"
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: 0755
+    - name: run create_profiles.sql script
+      become: yes
+      become_user: '{{ oracle_user }}'
+      environment: "{{ ora_user_env }}"
+      command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ oracle_base }}/admin/scripts/create_profiles.sql"
+      register: create_profiles_result
+      failed_when: '"ERROR" in create_profiles_result.stdout'
+  when: '"APP_ACCOUNT_PROFILE" not in pre_check_profile_result.stdout_lines or "USER_ACCOUNT_PROFILE" not in pre_check_profile_result.stdout_lines'
+
+- name: run pre_check_block_change.sql script
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ oracle_base }}/admin/scripts/pre_check_block_change.sql"
+  register: pre_check_block_change_result
+  failed_when: '"ERROR" in pre_check_block_change_result.stdout'
+
+- name: tasks to change the block tracking
+  block:
+    - name: Copy the block_change.sql to server
+      copy:
+        src: block_change.sql
+        dest: "{{ oracle_base }}/admin/scripts"
+        owner: "{{ oracle_user }}"
+        group: "{{ oracle_group }}"
+        mode: 0755
+    - name: run block_change.sql script
+      become: yes
+      become_user: '{{ oracle_user }}'
+      environment: "{{ ora_user_env }}"
+      command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ oracle_base }}/admin/scripts/block_change.sql"
+      register: block_change_result
+      failed_when: '"ERROR" in block_change_result.stdout'
+  when: '"ENABLED" not in pre_check_block_change_result.stdout_lines'

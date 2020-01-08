@@ -1,0 +1,28 @@
+---
+- name: Copy duplicate_database.sql and duplicate Database
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  block:
+  - name: Copy the duplicate_database.sql file
+    template: 
+      src: duplicate_database.j2
+      dest: "{{ oracle_tmp }}/duplicate_database.sql"
+  - name: duplicate Database
+    command: "rman target sys/{{ sourec_db_password }}@{{ source_db }} auxiliary sys/{{ target_db_password }}@{{ target_db }} @{{ oracle_tmp }}/duplicate_database.sql"
+  when: inventory_hostname != master_node
+
+- name: standby database disconnect
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  block:
+  - name: Copy the disconnect_session.sql file
+    copy: 
+      src: disconnect_session.sql
+      dest: "{{ oracle_tmp }}/disconnect_session.sql"
+  - name: check the disconnect_session
+    command: "sqlplus / as sysdba @{{ oracle_tmp }}/disconnect_session.sql"
+    register: opt3
+    failed_when: '"ERROR" in opt3.stdout'
+  when: inventory_hostname != master_node

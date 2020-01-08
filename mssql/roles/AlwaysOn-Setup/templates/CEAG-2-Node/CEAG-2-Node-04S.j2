@@ -1,0 +1,14 @@
+:setvar PrimaryReplica {{ PrimaryReplica }}
+:setvar SecondaryReplica {{ SecondaryReplica }}
+:setvar EndPointPort {{ EndPointPort }}
+:setvar AvailabilityGroup {{ AvailabilityGroup }}
+:setvar Listener {{ Listener }}
+:setvar IPListener {{ IPListener }}
+:setvar ListenerPort {{ ListenerPort }}
+:setvar ListenerSubnet {{ ListenerSubnet }}
+
+:Connect $(SecondaryReplica)
+ 
+ALTER AVAILABILITY GROUP [$(AvailabilityGroup)] JOIN;
+ 
+GO

@@ -1,0 +1,189 @@
+---
+- name: setup volumes
+  hosts: "{{ host }}"
+  become: yes
+  serial: 1
+
+ # if volume group exist it wont run it or  .... /opt
+
+  tasks:
+    - name: Check if Setup Volumes is already completed
+      stat:
+        path: /opt/setup_volumes
+      register: setup_volumes_result
+      ignore_errors: yes
+
+    #- name: Fail if Setup Volumes already Done
+    #  failed_when: stat_result.stat.exists
+    - debug:
+        var: setup_volumes_result
+      ignore_errors: yes
+
+    - set_fact:
+        disks:
+          - { raw: "/dev/{{disk}}db", part: "1", vg: ora-install }
+          - { raw: "/dev/{{disk}}dc", part: "1", vg: ora-dg-data01 }
+          - { raw: "/dev/{{disk}}dd", part: "1", vg: ora-dg-reco01 }
+          - { raw: "/dev/{{disk}}de", part: "1", vg: ora-dg-exp01 }
+          - { raw: "/dev/{{disk}}df", part: "1", vg: ora-dg-exp02 }
+          - { raw: "/dev/{{disk}}dg", part: "1", vg: ora-dg-exp03 }
+          - { raw: "/dev/{{disk}}dh", part: "1", vg: ora-dg-gg01 }
+          - { raw: "/dev/{{disk}}di", part: "1", vg: ora-dg-gg02 }
+          - { raw: "/dev/{{disk}}dj", part: "1", vg: ora-dg-gg03 }
+      when:
+      - install_type == "standalone"
+      - setup_volumes_result.stat.exists == false
+      vars:
+        disk: "{{ 'xv' if ansible_system_vendor == 'Xen' else 's' }}"
+      ignore_errors: yes
+
+    - set_fact:
+        disks:
+          - { raw: "/dev/{{disk}}dc", part: "1", vg: ora-dg-ocr01 }
+          - { raw: "/dev/{{disk}}dd", part: "1", vg: ora-dg-ocr02 }
+          - { raw: "/dev/{{disk}}de", part: "1", vg: ora-dg-ocr03 }
+          - { raw: "/dev/{{disk}}df", part: "1", vg: ora-dg-data01 }
+          - { raw: "/dev/{{disk}}dg", part: "1", vg: ora-dg-reco01 }
+          - { raw: "/dev/{{disk}}dh", part: "1", vg: ora-dg-exp01 }
+          - { raw: "/dev/{{disk}}di", part: "1", vg: ora-dg-exp02 }
+          - { raw: "/dev/{{disk}}dj", part: "1", vg: ora-dg-exp03 }
+          - { raw: "/dev/{{disk}}dk", part: "1", vg: ora-dg-gg01 }
+          - { raw: "/dev/{{disk}}dl", part: "1", vg: ora-dg-gg02 }
+          - { raw: "/dev/{{disk}}dm", part: "1", vg: ora-dg-gg03 }
+      when:
+        - install_type == "rac_install"
+        - setup_volumes_result.stat.exists == false
+      vars:
+        disk: "{{ 'xv' if ansible_system_vendor == 'Xen' else 's' }}"
+      ignore_errors: yes
+
+    - name: install the needed packages
+      yum:
+#        name: parted,lvm2,nfs-utils,nfs-utils-lib
+        name: parted,lvm2,nfs-utils
+        state: present
+      tags:
+        - mount_nfs
+        - create_lvms
+      ignore_errors: yes
+
+    - name: create the partition tables
+      command: parted -s "{{ item.raw }}" mklabel gpt mkpart oravg 1G 100% set "{{ item.part }}" lvm on quit
+      args:
+        creates: "{{ item.raw }}{{ item.part }}"
+      with_items: "{{ disks }}"
+      when: setup_volumes_result.stat.exists == false
+      tags:
+        - create_lvms
+
+    - pause:
+        seconds: 10
+
+    - name: create the volume groups
+      lvg:
+        vg: "{{ item.vg}}"
+        pvs: "{{ item.raw }}{{ item.part }}"
+        state: present
+      with_items: "{{ disks }}"
+      when: setup_volumes_result.stat.exists == false
+      tags:
+        - create_lvms
+
+    - pause:
+        seconds: 10
+
+    - name: create the oracle data fs lv
+      lvol:
+        vg: "{{ item.vg}}"
+        lv: lvol0
+        size: 100%FREE
+        shrink: no
+        state: present
+      with_items: "{{ disks }}"
+      when: setup_volumes_result.stat.exists == false
+      tags:
+        - create_lvms
+
+    - pause:
+        seconds: 10
+
+    - name: ensure LVMs are owned by Oracle
+      block:
+        - name: get logical volumes
+          find:
+            paths: "/dev/mapper"
+            file_type: any
+            patterns: ora--dg--*
+            use_regex: no
+          register: lvm_disks
+
+        - name: chown lvm disks
+          command: chown oracle:oinstall {{ item.path }}
+          loop: "{{ lvm_disks.files }}"
+      when: setup_volumes_result.stat.exists == false
+      #when: ansible_distribution == "RedHat"
+      tags:
+      - chown_lvm_disks
+
+    - name: Create a ext4 filesystem on ora--install-lvol0
+      filesystem:
+        fstype: ext4
+        dev: /dev/mapper/ora--install-lvol0
+      when:
+      - install_type == "standalone"
+
+    - name: Mount volume
+      mount:
+        path: /u01
+        src: /dev/mapper/ora--install-lvol0
+        fstype: ext4
+        state: mounted
+        opts: defaults
+      when:
+      - install_type == "standalone"
+
+    - name: Check logical volume
+      command: lvdisplay '/dev/ol/root'
+      changed_when: False
+      failed_when: False
+      register: lvdisplay
+
+    - name: resize root if '/dev/ol/root' exists
+      block:   
+        - name: resize the root partition
+          shell:
+            cmd: |
+              sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk /dev/xvda
+                d # delete partition
+                2 # partition number 2
+                n # new partition
+                p # primary partition
+                2 # partition number 2
+                  # default - start at beginning of disk 
+                  # default, extend partition to end of disk
+                t # choose partition type
+                8e # set type to LVM
+                p # print the in-memory partition table
+                w # write the partition table
+                q # done
+              EOF
+          register: shell_result
+          failed_when: "'Do you really want to quit?' not in shell_result.stderr"
+    
+        - name: resize the root partition
+          shell: partprobe
+    
+        - name: Extend the root volume to consume all remaining space in the volume group
+          lvol:
+            vg: ol
+            lv: root
+            size: +100%FREE
+            resizefs: true
+      when: lvdisplay.rc == 0
+
+    - name: Mark Setup Volumes Done
+      file:
+        path: /opt/setup_volumes
+        state: touch
+        mode: 0400
+      when: setup_volumes_result.stat.exists == false

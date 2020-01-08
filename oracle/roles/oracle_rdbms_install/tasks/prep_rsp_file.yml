@@ -1,0 +1,16 @@
+---
+
+- name: create oracle_install rsp file (11g)
+  template:
+    owner: "{{ oracle_user }}"
+    src: 11g_db_rsp.j2
+    dest: "{{ oracle_tmp }}/db_install.rsp"
+  diff: false
+  when: oracle_version | regex_replace ('^([0-9]{1,2}.[0-9]{1,}.[0-9]{1,})(.*)$','\g<1>') == "11.2.0"
+
+- name: create oracle_install rsp file (12c R1)
+  template:
+    src: 12c_R1_db_rsp.j2
+    dest: "{{ oracle_tmp }}/db_install.rsp"
+  diff: false
+  when: oracle_version | regex_replace ('^([0-9]{1,2}.[0-9]{1,}.[0-9]{1,})(.*)$','\g<1>') == "12.1.0"

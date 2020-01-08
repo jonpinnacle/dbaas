@@ -1,0 +1,5 @@
+---
+- hosts: linux
+  gather_facts: true
+  roles:
+    - linux_discovery

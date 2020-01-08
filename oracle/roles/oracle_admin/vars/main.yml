@@ -1,0 +1,31 @@
+---
+crs_type: "{%- if ansible_play_hosts | length > 1 -%}crs
+           {%- else -%}has
+           {%- endif %}"
+
+oracle_grid_home: "{{ oracle_grid_home }}"
+
+oracle_home: "{% if oracle_context == 'GRID' -%} {{ oracle_grid_home }}
+              {%- else -%}{{ oracle_base }}/oracle/product/{{ oracle_version }}/{{ oracle_db_home }}
+              {%- endif %}"
+
+oracle_user: oracle
+
+oracle_group: oinstall
+
+oracle_dba_group: dba
+
+# shell environment for the oracle user
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ oracle_sid }}"
+  ORACLE_UNQNAME: "{{ oracle_db_name }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ ansible_env.PATH }}:{{ oracle_home }}/bin"
+  TMP: "/u01/app/oracle"
+  TMPDIR: "/u01/app/oracle"
+
+cluster_nodes: "{{ ansible_play_hosts }}"
+
+master_node: "{{ ansible_play_hosts | sort | first }}"

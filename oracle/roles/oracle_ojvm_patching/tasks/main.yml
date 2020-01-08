@@ -1,0 +1,106 @@
+---
+- include_vars: secrets.yml
+  no_log: True
+
+# - name: Get oracle Database Home
+#   shell: "awk -F : 'NF > 1 {print $2}' /etc/oratab |grep -v grid|grep {{ oracle_version }}"
+#   changed_when: False
+#   register: ora_home_list
+#   ignore_errors: True
+- include_tasks: get_db_home.yml
+
+# - name: host checklist Running OJVM
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: 'OJVM Patch'
+#       checklist_category: 'Patching'
+#       gi_install_status: 'STARTED'
+#       task_desc: 'Applying OJVM'
+#       ticket_ref: "{{ ticket_ref }}"
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for OJVM PATCHING
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Applying OJVM"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    standard_task_id: "{{ standard_task_id }}"
+    task_message: "Applying OJVM for {{ ansible_hostname }} "
+  tags:
+  - apex_api
+
+- include_tasks: process_ojvm_patch.yml
+  when: ora_home_list | length > 0
+
+
+# - name: host checklist Completing OJVM
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: 'OJVM Patch'
+#       checklist_category: 'Patching'
+#       gi_install_status: 'SUCCESSFUL'
+#       task_desc: 'Applying OJVM'
+#       ticket_ref: "{{ ticket_ref }}"
+#   when:
+#     - ojvm_failures | length == 0
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for OJVM PATCHING
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Applying OJVM"
+    task_id: "{{ ticket_ref }}"
+    task_status: "SUCCESSFUL"
+    task_message: "Applying OJVM for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  when:
+    - ojvm_failures | length == 0
+  tags:
+  - apex_api
+
+# - name: host checklist Completing OJVM
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: 'OJVM Patch'
+#       checklist_category: 'Patching'
+#       gi_install_status: 'Failed'
+#       task_desc: 'Applying OJVM'
+#       ticket_ref: "{{ ticket_ref }}"
+#   when:
+#     - ojvm_failures | length > 0
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for OJVM PATCHING
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Applying OJVM"
+    task_id: "{{ ticket_ref }}"
+    task_status: "FAILED"
+    task_message: "Applying OJVM for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  when:
+    - ojvm_failures | length > 0
+  tags:
+  - apex_api

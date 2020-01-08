@@ -1,0 +1,66 @@
+---
+- name: check oracle_db_name is defined or not
+  debug:
+    msg: The Variable oracle_db_name is not defined
+  when: oracle_db_name is undefined
+
+- name: set oracle_home
+  block:
+    - name: get oracle_sid
+      shell: ps -ef | grep smon | grep {{ oracle_db_name }} | grep -v grep | awk '{ print $8 }'
+      register: ps_grep_smon
+      changed_when: False
+
+    - name: set oracle_sid
+      set_fact:
+        oracle_sid: "{{ ps_grep_smon.stdout | regex_replace('ora_smon_(.*)', '\\1') }}"
+#      when: oracle_db_name > length=0
+
+    - name: get db details
+      shell: grep "^{{ oracle_db_name }}:" /etc/oratab | awk 'NR == 1'
+      ignore_errors: yes
+      changed_when: false
+      register: db_details
+
+    - name: set oracle_database_home
+      set_fact:
+        oracle_database_home: "{{ db_details.stdout | regex_replace('^[^:]*:([^:]*).*', '\\1') }}"
+
+    - fail:
+        msg: Database named {{ oracle_db_name }} doesn't exists'
+      when: oracle_database_home == ""
+  when: oracle_context_database
+  ignore_errors: yes
+
+- name: create tmp dir
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}"
+    state: directory
+    recurse: yes
+
+- name: tasks only if db exists
+  block:
+    - name: create tmp dir to store post valdation sql files
+      file:
+        group: "{{ oracle_group }}"
+        owner: "{{ oracle_user }}"
+        path: "{{ sql_file_path }}"
+        state: directory
+        recurse: yes
+
+    - name: copy all the sql files that validate db
+      copy:
+        owner: "{{ oracle_user }}"
+        src: "{{ sql_file }}"
+        dest: "{{ sql_file_path }}/{{ sql_file }}"
+        force: no
+      loop: "{{ sql_files }}"
+      loop_control:
+        loop_var: sql_file
+#  when: oracle_database_home !='' and oracle_context_database
+  when: oracle_context_database
+  ignore_errors: yes
+
+- include_tasks: validations.yml

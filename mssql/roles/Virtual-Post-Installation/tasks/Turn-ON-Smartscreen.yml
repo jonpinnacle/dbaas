@@ -1,0 +1,10 @@
+---
+- name: Copy the SmartScreen Script
+  win_copy:
+    src: ../files/SmartScreenSettings-ON.ps1
+    dest: c:\Ansible\Temp\SmartScreenSettings-ON.ps1   
+
+- name: Turn Off Smartscreen
+  win_shell: |
+    C:\Ansible\Temp\SmartScreenSettings-ON.ps1 > C:\Ansible\Logs\SmartScreenSettings-ON.log
+    

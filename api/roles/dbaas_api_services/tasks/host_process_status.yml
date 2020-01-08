@@ -1,0 +1,39 @@
+---
+#- include_tasks: get_host_code.yml
+
+#- include_vars: var_host_capacity_insertion.yml
+
+- name: POST in V_PROCESS_STATUS
+  block: 
+  - name: Insert Message into Process Status
+    uri:
+      url: "{{ apex_url }}/charter/send_process_status"
+      validate_certs: no  # should be removed after https certs becomes renewed
+      method: POST
+      body_format: json
+      body: "{{ task_body }}"
+      headers:
+        Content-Type: "application/json"
+        Cache-Control: "no-cache"
+        record_type: "{{ task_rec_type }}"
+        task_area: "{{ task_area }}"
+        task_app: "{{ task_app }}"
+        task_id: "{{ task_id }}"
+        task_key: "{{ task_key }}"
+        task_status: "{{ task_status }}"
+        task_message: "{{ task_message }}"
+        standard_task_id: "{{ standard_task_id }}"
+    register: v_host_capacity_insertion_response
+
+
+  #- name: debug var_host_inventory_insertion
+  #  debug: 
+  #    var: host_capcity_insrt_body
+  rescue:
+  - name: Store the Json If APEX Server Is Down
+    delegate_to: localhost
+    lineinfile:
+      path: "{{ json_backup_dir }}/host_capacity_insertion.json"
+      line: "{{ v_host_capacity_insertion_response  | to_json }}"
+      create: yes
+    when: v_host_capacity_insertion_response.status == "500" or  v_host_capacity_insertion_response.status == -1

@@ -1,0 +1,39 @@
+
+---
+
+- import_tasks: get_host_code.yml
+  when: host_code is not defined
+
+- import_tasks: get_db_id.yml
+  vars:
+    mssql_db_name: "{{ mssql_db_name }}"
+
+- include_vars: var_db_inventory_insertion.yml
+
+- name: Complete Tasks Of DB Inventory Insertion
+  block:
+  #  "app_id" is a fk and needs to discussed and is not in body of post call
+  - name: Make A POST Call To Insert DB Inventory Details In V_DB_INVENTORY
+    win_uri:
+      url: "{{ apex_url }}/insert_db_inventory"
+      validate_certs: no  # should be removed after https certs becomes renewed
+      method: POST
+      body_format: json
+      body: "{{ db_invntry_insertion_body }}"
+      headers:
+          Content-Type: "application/json"
+    register: v_db_inventory_insertion_response
+    when: inventory_hostname == master_node
+
+  rescue:
+  - name: Store the Json If APEX Server Is Down
+    delegate_to: localhost
+    win_lineinfile:
+      path: "{{ json_backup_dir }}/{{ mssql_db_name }}_db_inv_insertion.json"
+      line: "{{ db_invntry_insertion_body  | to_json }}"
+      create: yes
+    when: 
+    - inventory_hostname == master_node
+    - v_db_inventory_insertion_response.status_code == 500 or  v_db_inventory_insertion_response.status_code == -1
+  when: db_id == ""
+

@@ -1,0 +1,88 @@
+#jinja2: trim_blocks:False, lstrip_blocks:True
+{%- if catalog_dest_type == 'HOST_CATALOG_TBL' -%}
+{
+    "host_name":"{{ inventory_hostname }}",
+    "domain":"{{ ansible_domain }}",
+    "platform_vendor": "{{ platform_vendor }}",
+    "env_category":"",
+    "hardware_vendor":"{{ ansible_product_version }}",
+    "os_category":"{{ ansible_distribution_version }}",
+    "monitoring_tool":"{{ server_monitoring_tool }}",
+    "cloud_provider":"",
+    "dc_location":"{{ dc_location }}",
+    "app_id":"{{ app_ref_id }}",
+    "virtual_phys":"{{ phy_virt }}",
+    "server_model":"{{ ansible_bios_version }}",
+    "detail":[
+        {
+            "desc": "cpu count",
+            "value": "{{ ansible_processor_count }}",
+            "category": "harware",
+        },
+        {
+            "desc": "memory count",
+            "value": "{{ ansible_memtotal_mb }}",
+            "category": "hardware",
+        }
+    ]
+}
+{%- endif -%}
+{%- if catalog_dest_type == 'DB_CATALOG_TBL' -%}
+{
+    "host_name":"{{ inventory_hostname }}",
+    "db_name": "{{ deploy_db_name }}",
+    "platform_vendor": "{{ platform_vendor }}",
+    "ha_enabled": "N",
+    "pci": "{{ pci_required | default('') }}",
+    "sox": "{{ sox_required | default('') }}",
+    "cloud": "Y",
+    "app_id": "{{ app_ref_id }}",
+    "db_desc": "db1 test",
+    "db_version": "{{ deploy_db_version | default('') }}",
+    "dc_location":"{{ dc_location }}",
+    "detail": [
+        {
+            "desc": "datagaurd",
+            "value": "Y",
+            "category": "extra_vars"
+        },
+        {
+            "desc": "databse_role",
+            "value": "{{ database_role | default('') }}",
+            "category": "extra_vars"
+        },
+        {
+            "desc": "env_category",
+            "value": "{{ db_environment }}",
+            "category": "db_property"
+        }
+    ]
+}
+{%- endif -%}
+{%- if catalog_dest_type == 'HA_MAPPING_TBL' -%}
+{
+    "host_code":"",
+    "shard_host_ci":"{%- if mongo_type is defined and mongo_type == 'shard' -%}{{ inventory_hostname }}{%- endif -%}",
+    "platform_vendor": "{{ platform_vendor }}",
+    "ha_type":"{%- if platform_vendor|lower == 'mongodb' -%}Replication{%- endif -%}",
+    "master_host_ci":"{%- if mongo_type is defined and mongo_type == 'configure' -%}{{ inventory_hostname }}{%- endif -%}",
+    "slave_host_ci":"",
+    "primary_host_ci":"",
+    "standby_host_ci":"",
+    "system_name":"{{ inventory_hostname }}",
+    "aag_primary":"",
+    "aag_nodes":"",
+    "detail":[
+        {
+            "desc": "",
+            "value": "",
+            "category": "",
+        },
+        {
+            "desc": "",
+            "value": "",
+            "category": "",
+        }
+    ]
+}
+{%- endif -%}

@@ -1,0 +1,19 @@
+---
+- name: copy the Alter-tempdb-SQL2 file
+  win_template:
+      src: ../templates/Alter-tempdb-SQL2.j2
+      dest: c:\Ansible\Temp\Alter-tempdb-SQL2.ps1
+  diff: false
+
+- name: Alter-tempdb-SQL2 file
+  win_shell:
+     C:\Ansible\Temp\Alter-tempdb-SQL2.ps1 > C:\Ansible\Logs\Alter-tempdb-SQL2.log
+  register: Alter_tempdb
+  no_log: false
+
+- name: Protected Output - Alter-tempdb-SQL2 file
+  debug:
+    var: "Alter_tempdb | combine({'cmd': Alter_tempdb.cmd | replace(SaPw, '<PASSWORD HIDDEN>') | replace(password, '<PASSWORD HIDDEN>')})"
+  # failed_when: Alter_tempdb.rc
+  failed_when: '"failed" in Alter_tempdb.stderr'
+  when: Alter_tempdb.changed

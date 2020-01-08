@@ -1,0 +1,77 @@
+#--- host inventory insertion ---
+# - include: host_inventory_insertion.yml
+#--- host inventory insertion ---
+
+#---- cluster member insertion ---
+# - include: cluster_member_insertion.yml
+#---- cluster member insertion ---
+
+# ---- host inventory update ----
+# - name: get cluster_id
+#   shell: cat /root/api_service/ansible_db_details.txt | grep -e '^ID Of cluster' | awk -F '=' '{print $2}'
+#   register: cluster_id
+# - include: host_inventory_update.yml
+#   vars:
+#     update_host_inv_body:
+#     - { key: "server_monitoring_tool" , value: "Cool Tool" }
+#     - { key: "network_type" , value: "RED" }
+#     - { key: "network_type" , value: "BLUE" }
+#     - { key: cluster_id , value: "{{ cluster_id.stdout | int }}" }
+# ---- host inventory update ----
+
+
+#---- db inventory table insertion ------
+# - include_vars: var_db_inventory_insertion.yml
+# - name: set a variable of db's specific to host
+#   set_fact:
+#     host_specific_dbs: "{{ item.databases }}"
+#   when: item.host_name == ansible_hostname
+#   with_items: "{{ db_details }}"
+# - include: db_inventory_insertion.yml db_values="{{ item }}"
+#   with_items: "{{ host_specific_dbs }}"
+#---- db inventory table insertion ------
+
+#----db_checklist_insertion-------
+# FOR DB INVENTORY CHECKLIST INSERTION
+# - name: get the db_name and id
+#   shell: cat /root/api_service/ansible_db_details.txt | grep -e '^ID Of .* database' | awk -F ' ' '{split($4,a,"="); print a[2]  " "  $3}'
+#   register: db_details
+# - include: db_checklist_insertion.yml db_name_and_id="{{ item }}"
+#   with_items: "{{ db_details.stdout_lines }}"
+#   when: db_details.stdout != ""
+# FOR HOST INVENTORY CHECKLIST INSERTION
+# - include: host_checklist_insertion.yml
+# FOR CLUSTER INVENTORY CHECKLIST INSERTION
+# - include: cluster_checklist_insertion.yml
+#----db_checklist_insertion-------
+
+
+#---db_checklist_update----
+# FOR DB CHECKLIST UPDATE
+# - name: get the db_name and id
+#   shell: cat /root/api_service/ansible_db_details.txt | grep -e '^ID Of .* database' | awk -F ' ' '{split($4,a,"="); print a[2]  " "  $3}'
+#   register: db_details
+# - include: db_checklist_update.yml db_name_and_id="{{ item }}"
+#   vars:
+#     update_db_cklist_body:
+#       - { key: checklist_type , value: "DEMO_TOMORROW" }
+#       - { key: db_install_status , value: "DEL_THIS" }
+#   with_items: "{{ db_details.stdout_lines }}"
+#   when: db_details.stdout != ""
+# FOR HOST CHECKLIST UPDATE
+# - include: host_checklist_update.yml
+#   vars:
+#     update_host_cklist_body:
+#       - { key: checklist_type , value: "test" }
+#       - { key: db_install_status , value: "awesome" }
+# FOR CLUSTER CHECKLIST UPDATE
+# - include: cluster_checklist_update.yml
+#   vars:
+#     update_cluster_cklist_body:
+#       - { key: checklist_type , value: "test" }
+#       - { key: db_install_status , value: "awesome" }
+#---db_checklist_update----
+
+
+
+ 

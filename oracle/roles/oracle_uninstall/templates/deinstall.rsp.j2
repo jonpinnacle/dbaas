@@ -1,0 +1,160 @@
+###############################################################################
+## Copyright(c) Oracle Corporation 1998,2014. All rights reserved.##
+##                                                                           ##
+## Specify values for the variables listed below to customize                ##
+## your deinstallation.                                                      ##
+##                                                                           ##
+## Each variable is associated with a comment. The comment                   ##
+## can help to populate the variables with the appropriate                   ##
+## values.                                                                   ##
+##                                                                           ##
+###############################################################################
+
+#The comma separated list of nodes in Oracle clusterware
+CLUSTER_NODES={% if rac_install == 'true' -%}{{ cluster_node_string | join(',') }}
+{% else %}
+
+{% endif %}
+
+#The complete path of Oracle central inventory
+INVENTORY_LOCATION={{ install_base }}/oraInventory
+
+#The complete path of Oracle Clusterware home
+ORA_CRS_HOME=
+
+#Set to 'true' if deinstalling CRS home; 'false' otherwise>
+CRS_HOME=
+
+#Remote nodes list
+REMOTE_NODES={{ cluster_nodes[1:] | default('') }}
+
+#Local Node
+LOCAL_NODE={{ hostvars[master_node]['ansible_hostname'] }}
+
+# Network Properties
+# The name of Oracle home in Oracle central inventory
+NETCA_HOME_NAME=
+
+#The comma separated list of listener prefixes selected for deconfiguring in this home
+NETCA_CLEANUP_LSNR_PREFIX_LIST=
+
+#if listeners with prefix <Listener Prefix Name> has to be migrated to another home; specify the complete path of the Oracle home
+NETCA_MIGRATE_TO_HOME_<Listener Prefix Name>=
+
+#Comma separated list of LISTENER prefixes that will be migrated to another oracle home
+NETCA_MIGRATE_LSNR_PREFIX_LIST=
+
+#The comma separated list of nodes the <Listener prefix Name> chosen for deconfigure or migrate
+NETCA_NODELIST_<Listener prefix Name>=
+
+#The comma separated list of nodes the <Listener prefix Name> chosen for deconfigure
+NETCA_CLEANUP_NODELIST_<Listener prefix Name>=
+
+#Home Common properties
+#set to 'true' if Oracle RAC database home has Oracle binary and it is functioning properly; false, otherwise
+ORACLE_BINARY_OK=true
+
+#Set to 'true' if the home to be deinstalled is version 11.2.0.1.0 or above; otherwise set to false.  This is used only if the deinstall tool cannot detect the home version.
+ORACLE_HOME_VERSION_VALID=true
+
+#Database properties
+
+#The command separated list of Databases to be deconfigured
+DB_UNIQUE_NAME_LIST=
+
+#Use 'y' if the database was created out of the home. use 'n' if the database was upgraded from another home
+CREATION_MODE.<database-name>=
+
+#The comma separated list of nodes on which the Oracle database instances are configured
+NODE_LIST.<database-name>=
+
+#The local instance name of the database
+LOCAL_SID.<database-name>=
+
+#Instance(SID) list for the database instances for each node
+SID_LIST.<database-name>=
+
+#If ORACLE_BASE environment value was set during database creation, provide the value
+ORACLE_BASE.<database-name>=
+
+#Full path to the SPfile location of database instance, if SPfile option was selected
+SPFILE_LOC.<database-name>=
+
+#Storage Type can be any of ASM, CFS or RAW
+STORAGE_TYPE.<database-name>=
+
+#List of directories if any database files exist on a shared file system. 
+#Required for CFS storage, optional for ASM and RAW
+#If Database-name subdirectory is found, it will be deleted. 
+#Otherwise, specified directory will be deleted. 
+#Alternatively, you can specify list of database files with full path
+DATAFILE_LOC.<database-name>=
+
+#Raw device mapping file if storage type is RAW
+RAW_MAPPING_FILE.<database-name>=
+
+#The comma separated list of Disk groups used by this database, if storage type is ASM
+DISK_GROUPS.<database-name>=
+
+#ASM Oracle home path, if storage type is ASM
+ASM_HOME=
+
+#Dump destination directory for the database
+DUMP_DESTINATION_LOC.<database-name>=
+
+#Archive log destination directory
+ARCHIVE_LOG_DESTINATION_LOC.<database-name>=
+
+#Flash recovery area location
+FLASH_RECOVERY_LOC.<database-name>=
+
+#The previous version of the upgraded database
+DBUA.OLD_DB_VERSION.<database-name>=
+
+#Full path to Restore Script if Restore option was selected during Database Upgrade
+DBUA.BACKUP_LOC.<database-name>=
+
+#Full path to SYSAUX data file location, only if prior db version 9.2
+DBUA.SYSAUX_DATAFILE_LOC.<database-name>=
+
+#Oracle Home of the database prior to upgrade
+DBUA.OLD_OH.<database-name>=
+
+#ASM properties
+#List of Nodes selected for configuring ASM instances
+#If ASM is not configured in this home, leave this value empty
+#If this property has values, specify ASM related values
+ASM_NODE_LIST=
+
+#The comma separated ASM instance names, if ASM is configured
+ASM_SID_LIST=
+
+#Full path to the SPfile location of ASM instance, if SPfile option was selected
+ASM_SPFILE_LOC=
+
+#List of Disk groups created in this ASM instance
+ASM_DISK_GROUPS=
+
+#ASM Instance Creation, Specify 'y' if ASM was created and 'n' if ASM was upgraded from prior version
+ASM_CREATION_MODE=
+
+#ORACLE_BASE environment, if set during ASM creation or upgrade
+ASM_ORACLE_BASE=
+
+#Local Instance Name of the ASM instance(Generally, +ASM1)
+ASM_LOCAL_SID=
+
+#The comma separated list of remote_listener parameter, tns aliases for each upgraded ASM instances
+DBUA.OLD_REMOTE_LISTENER=
+
+#The comma separated list of local_listener parameter, tns aliases for each upgraded ASM instances
+DBUA.OLD_LOCAL_LISTENER_LIST=
+
+#Oracle home path value prior to migration of the ASM Instance
+DBUA.ASM_OLD_OH=
+
+### The following parameters are required for deinstalling Oracle RAC database home
+#The group name of the Oracle user who installed Oracle Clusterware or Oracle RAC database homes
+DBA_GROUP=dba
+#The name of the user who installed Oracle Clusterware or Oracle RAC database homes
+ORACLE_OWNER=oracle

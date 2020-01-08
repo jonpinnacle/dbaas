@@ -1,0 +1,53 @@
+---
+#- name: Copy the Install-SQL
+#  win_template:
+#    src: ../templates/Install-SQL.j2
+#    dest: c:\Ansible\Temp\Install-SQL.ps1
+#
+#- name: Install-SQL
+#  win_shell:
+#    C:\Ansible\Temp\Install-SQL.ps1 > C:\Ansible\Logs\Install-SQL.log
+#
+#- name: Read SQL Installation Log file
+#  win_shell:
+#    gc C:\Ansible\Logs\Install-SQL.log
+#
+- name: install DSC resource
+  win_psmodule:
+    name: SqlServerDsc
+    state: present
+
+- name: find ISO in downloaded media
+  win_find:
+    paths: D:\Install
+    patterns: '*.iso'
+    file_type: file
+  register: iso_find
+
+- name: mount image
+  win_disk_image:
+    image_path: D:\Install\SQL2014\en_sql_server_2014_developer_edition_x64_dvd_3940406.iso
+    state: present
+  register: mount_info
+
+- name: install SQL Server
+  win_dsc:
+    resource_name: SQLSetup
+    Action: Install
+    SourcePath: "{{ mount_info.mount_paths[0] }}"
+    InstanceName: MSSQLSERVER
+    Features: "SQLENGINE,FullText,SSMS,ADV_SSMS"
+    SQLSysAdminAccounts: "{{ adminaccounts }}"
+    AgtSvcStartupType: Automatic
+    BrowserSvcStartupType: Automatic
+    InstallSQLDataDir: "{{ SystemPath }}"
+    SQLUserDBDir: "{{ DataPath }}"
+    SQLUserDBLogDir: "{{ LogPath }}"
+    SQLTempDBDir: "{{ TempdbPath }}"
+    SQLBackupDir: "{{ BuPath }}"
+    UpdateEnabled: False
+    SecurityMode: SQL
+    SAPwd_username: sa
+    SAPwd_password: "{{ SaPw }}"
+    PsDscRunAsCredential_username: "{{ domain_admin_username }}@{{ dns_domain_name }}"
+    PsDscRunAsCredential_password: '{{ ansible_password }}'

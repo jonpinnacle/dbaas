@@ -1,0 +1,5 @@
+- name: Delete Administrators
+#  hosts: Physical-Windows
+  hosts: '{{ host }}'
+  roles:
+     - Delete-Administrators

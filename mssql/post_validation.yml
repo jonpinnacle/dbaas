@@ -1,0 +1,4 @@
+- name: Check for post validation after the MSSQL Installation
+  hosts: '{{ host }}'
+  roles:
+     - Post_validation

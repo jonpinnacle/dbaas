@@ -1,0 +1,21 @@
+---
+ext: "{%- if SqlVersion == 2012 -%}11
+      {%- elif SqlVersion == 2014 -%}12
+      {%- elif SqlVersion == 2016 -%}13
+      {%- elif SqlVersion == 2017 -%}14
+      {%- endif %}"
+
+NewFile: 'D:\Install\SQL{{ SqlVersion }}\{{ ansible_hostname }}-ConfigurationFile.ini'
+
+######################################
+## The following Vars are found in  ##
+## vars/Physical-Secrets.yml        ##
+##                                  ##
+## FTP Server Details               ##
+##  - unc_password                  ##
+## local DB Sa password             ##
+##  - SaPw                          ##
+## SQL MGT Server Details           ##
+##  - password                      ##
+######################################
+

@@ -1,0 +1,9 @@
+- name: Install Post Installation on mssql Virtual Machine
+#  hosts: Virtual-Windows 
+  hosts: '{{ host }}'
+  roles:
+     - Virtual-Post-Installation
+  
+  
+
+  

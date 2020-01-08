@@ -1,0 +1,9 @@
+---
+patch_history:
+  db_home:  "{{ db_home }}"
+  PSU_NUMBER:  "{{ patch_num }}"
+  PSU_QUARTER:  "{{ patch_quarter }} "
+  PSU_YEAR: "{{ patch_year }}"
+  patch_type:  "{{ patch_type }}"
+  host_code: "{{ host_code }}"
+  host_name: "{{ ansible_hostname }}"

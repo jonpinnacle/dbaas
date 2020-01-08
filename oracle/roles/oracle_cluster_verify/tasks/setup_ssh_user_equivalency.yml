@@ -1,0 +1,40 @@
+---
+- name: Create a 2048-bit SSH key for oracle user
+  user:
+    name: oracle
+    generate_ssh_key: yes
+    ssh_key_bits: 2048
+    ssh_key_file: .ssh/id_rsa
+  register: ssh_key
+
+- name: put public key in authorized_keys 
+  authorized_key:
+    user: oracle
+    state: present
+    key: "{{ hostvars[current_node]['ssh_key']['ssh_public_key'] }}"
+  no_log: True  
+  loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+  loop_control:
+    loop_var: current_node
+
+- name: add hosts to known_hosts (hostname)
+  become: yes
+  become_user: "{{ oracle_user }}"
+  known_hosts:
+    name: "{{ hostvars[current_node]['ansible_hostname'] }}"
+    key: "{{ hostvars[current_node]['ansible_hostname'] }},{{ hostvars[current_node]['ansible_default_ipv4']['address'] }} ssh-rsa {{ hostvars[current_node]['ansible_ssh_host_key_rsa_public'] }}"
+  no_log: True
+  loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+  loop_control:
+    loop_var: current_node
+
+- name: add hosts to known_hosts (fqdn)
+  become: yes
+  become_user: "{{ oracle_user }}"
+  known_hosts:
+    name: "{{ hostvars[current_node]['ansible_fqdn'] }}"
+    key: "{{ hostvars[current_node]['ansible_fqdn'] }},{{ hostvars[current_node]['ansible_default_ipv4']['address'] }} ssh-rsa {{ hostvars[current_node]['ansible_ssh_host_key_rsa_public'] }}"
+  no_log: True
+  loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+  loop_control:
+    loop_var: current_node

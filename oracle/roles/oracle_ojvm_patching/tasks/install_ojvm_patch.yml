@@ -1,0 +1,27 @@
+---
+
+- name: apply ojvm patch  
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: "{{ oracle_home }}/OPatch/opatch apply -silent {{ oracle_tmp }}/{{ patch_num }} -ocmrf {{ oracle_tmp }}/ocm.rsp"
+  ignore_errors: yes
+  register: ojvm_patch_output
+  failed_when: '"OPatch failed" in ojvm_patch_output.stdout or "ERROR" in ojvm_patch_output.stdout' 
+
+- name: save ojvm patch stdout
+  copy:
+    dest: "{{ oracle_tmp }}/{{ oracle_home | basename }}_ojvm_patch_output_stdout.out"
+    content: "{{ ojvm_patch_output.stdout }}"
+  changed_when: False
+
+- name: save ojvm patch stderr
+  copy:
+    dest: "{{ oracle_tmp }}/{{ oracle_home | basename }}_ojvm_patch_output_stderr.err"
+    content: "{{ ojvm_patch_output.stderr }}" 
+  changed_when: False
+  when: ojvm_patch_output.stderr_lines | length > 0
+
+- name: add failures to ojvm_failures
+  set_fact:
+      ojvm_failures: "{{ ojvm_failures }} + ['{{ oracle_home | basename }}']"
+  when: ojvm_patch_output is failed

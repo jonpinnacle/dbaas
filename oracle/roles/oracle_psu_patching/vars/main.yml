@@ -1,0 +1,31 @@
+---
+
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+pstage: "{{ oracle_base }}/software/PSU"
+
+patch_num: "{{ patch_file | regex_replace('p([0-9]*)_.*','\\1') }}"
+
+patch_version: "{% if patch_type == 'RDBMS' -%}{{ oracle_version }}
+                {%- elif patch_type == 'GRID' -%}{{ grid_version }}
+                {%- endif %}"
+#psu_patch_path: "{{ oracle_installer_path }}/PSU-RU/{{ grid_version }}/{{ patch_quarter }}_{{ patch_year }}"
+psu_patch_path: "{{ oracle_installer_path }}/PSU-RU/{{ patch_version }}/{{ patch_quarter }}_{{ patch_year }}"
+
+oracle_home: "{% if patch_type == 'RDBMS' -%}{{ oracle_base }}/product/{{ oracle_version }}/{{ oracle_psu_home }}
+              {%- elif patch_type == 'GRID' -%}{{ install_base }}/{{ grid_version }}/grid_1
+              {%- endif %}"
+
+oracle_user: oracle
+
+oracle_group: oinstall
+
+oracle_tmp: /u01/tmp/PSU/{{ patch_type }}/{{ patch_num}}
+
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ oracle_sid }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  PATH: "{{ ansible_env.PATH }}:{{ oracle_home }}/OPatch"
+  TMP: "/u01/app/oracle"
+  TMPDIR: "/u01/app/oracle"

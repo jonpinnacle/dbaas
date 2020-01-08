@@ -1,0 +1,4 @@
+- name: Check for Pre checks  before the MSSQL Installation
+  hosts: '{{ host }}'
+  roles:
+     - Pre_checks

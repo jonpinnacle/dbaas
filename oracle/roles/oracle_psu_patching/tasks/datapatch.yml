@@ -1,0 +1,32 @@
+---
+
+- name: get oracle_sid
+  shell: ps -ef | grep smon | grep {{ oracle_db_name }} | grep -v grep | awk '{ print $8 }'
+  register: ps_grep_smon
+  changed_when: False
+
+- name: set oracle_sid
+  set_fact:
+    oracle_sid: "{{ ps_grep_smon.stdout | regex_replace('.*_smon_(.*)', '\\1') }}"
+
+- block: 
+  - name: Run datapatch on {{ oracle_db_name }}
+    become: yes
+    become_user: "{{ oracle_user }}"
+    environment: "{{ ora_user_env }}"
+    command: datapatch -verbose
+    register: datapatch
+
+  - name: save datapatch stdout
+    copy:
+      dest: "{{ oracle_tmp }}/{{ oracle_db_name }}_datapatch.out"
+      content: "{{ datapatch.stdout }}"
+    changed_when: False
+
+  - name: save datapatch stderr
+    copy:
+      dest: "{{ oracle_tmp }}/{{ oracle_db_name }}_datapatch.err"
+      content: "{{ datapatch.stderr }}"
+    changed_when: False
+    when: datapatch.stderr_lines | length > 0
+  when: oracle_sid != ''

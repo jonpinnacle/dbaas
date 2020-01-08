@@ -1,0 +1,6 @@
+---
+- include_vars: Physical-Secrets.yml
+  no_log: True
+
+
+- include: Security-Playbook.yml

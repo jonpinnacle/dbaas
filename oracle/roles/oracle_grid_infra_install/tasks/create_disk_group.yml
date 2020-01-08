@@ -1,0 +1,102 @@
+---
+  # - include_tasks: host_checklist_post_update.yml
+  #   vars:
+  #     new_entry: True
+  #     host_name: "{{ ansible_hostname }}"
+  #     task_desc: creating disk groups
+  #     checklist_type: 'Configuring Disk Groups {{ diskgroup_name }} '
+  #     checklist_category: Configure
+  #     gi_install_status: IN PROGRESS
+  #   when: inventory_hostname == master_node
+  #   tags:
+  #   - apex_api
+
+- name: db checklist status post for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Grid Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "IN_PROGRESS"
+    standard_task_id: "{{ standard_task_id_val }}"
+    task_message: "Configuring Disk Group for {{ diskgroup_name }} "
+  when: inventory_hostname == master_node
+  tags:
+  - apex_api
+
+- name: create {{ diskgroup_name }} DG
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  no_log: true
+  ignore_errors: true
+  command: asmca \
+            -silent \
+            -createDiskGroup \
+            -diskGroupName {{ diskgroup_name }} \
+            -diskList '{{ diskgroup_list  | json_query("files[].path") | join("','") }}' \
+            -redundancy {{ diskgroup_redun }} \
+            -au_size 4 \
+            -compatible.asm {{ oracle_compat_version }} \
+            -compatible.rdbms {{ oracle_compat_version }} \
+            -sysAsmPassword {{ oracle_asm_syspass }} \
+  register: diskgroup_create
+
+- name: Protected Debug Output - create {{ diskgroup_name }} DG
+  debug:
+    var: "lookup('vars', 'diskgroup_create') | combine({'cmd': lookup('vars', 'diskgroup_create').cmd | replace(oracle_asm_syspass, '<PASSWORD HIDDEN>')})"
+  when: lookup('vars', 'diskgroup_create').failed
+
+- name: save create_{{ diskgroup_name }}.out
+  copy:
+    dest: "{{ oracle_tmp }}/create_{{ diskgroup_name }}.out"
+    content: "{{ lookup('vars', 'diskgroup_create').stdout | default('') }}"
+  when: lookup('vars', 'diskgroup_create').changed
+  tags: upgrade_script
+
+- name: save create_{{ diskgroup_name }}.err
+  copy:
+    dest: "{{ oracle_tmp }}/create_{{ diskgroup_name }}.err"
+    content: "{{ lookup('vars', 'diskgroup_create').stderr | default('') }}"
+  when:
+  - lookup('vars', 'diskgroup_create').changed
+  - lookup('vars', 'diskgroup_create').stderr_lines | length > 0
+  tags: upgrade_script
+
+- name: db checklist status post for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Grid Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "{% if lookup('vars', 'diskgroup_create') is failed -%}FAILED
+                 {%- else -%}SUCCESSFUL
+                 {%- endif %}"
+    standard_task_id: "{{ standard_task_id_val }}"
+    task_message: "Configuring Disk Group for {{ diskgroup_name }} "
+  when: inventory_hostname == master_node
+  tags:
+  - apex_api
+
+# - include_role:
+#     name: oracle_api_services
+#     tasks_from: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: True
+#       host_name: "{{ ansible_hostname }}"
+#       task_desc: creating disk groups
+#       checklist_type: 'Configuring Disk Groups {{ diskgroup_name }} '
+#       checklist_category: Configure
+#       gi_install_status: "{% if lookup('vars', diskgroup_name + '_create') is failed -%}FAILED
+#                           {%- else -%}SUCCESSFUL
+#                           {%- endif %}"
+#   when: inventory_hostname == master_node
+#   tags:
+#   - apex_api
+- set_fact:
+    diskgroup_failed: "{% if lookup('vars', 'diskgroup_create') is failed -%}TRUE
+                          {%- endif %}"

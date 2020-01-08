@@ -1,0 +1,110 @@
+<#########################################################################################################
+<##Install SQL                                                                                          ##
+##########################################################################################################>
+
+If ("{{ SqlVersion }}" -eq "2012")
+{
+	If ('{{ Env1 }}' -eq 'PRD' -or '{{ Env1 }}' -eq 'DR')
+	{
+		$MountResult = Mount-DiskImage D:\Install\SQL2012\en_sql_server_2012_enterprise_edition_x86_x64_dvd_813294.iso -PassThru
+		$DriveLetter = ($MountResult | Get-Volume).DriveLetter
+		$DriveLetter = $DriveLetter + ":"
+		cd $DriveLetter
+		
+		.\setup.exe /ConfigurationFile={{ NewFile }} /QUIETSIMPLE=False /Q
+		
+		Dismount-DiskImage -ImagePath "D:\Install\SQL2012\en_sql_server_2012_enterprise_edition_x86_x64_dvd_813294.iso"
+	}
+	Else
+	{
+		$MountResult = Mount-DiskImage D:\Install\SQL2012\en_sql_server_2012_developer_edition_x86_x64_dvd_813280.iso -PassThru
+		$DriveLetter = ($MountResult | Get-Volume).DriveLetter
+		$DriveLetter = $DriveLetter + ":"
+		cd $DriveLetter
+		.\Setup.exe /ConfigurationFile={{ NewFile }} /QUIETSIMPLE=False /Q
+		
+		Dismount-DiskImage -ImagePath "D:\Install\SQL2012\en_sql_server_2012_developer_edition_x86_x64_dvd_813280.iso"
+		
+	}
+}
+
+If ("{{ SqlVersion }}" -eq "2014")
+{
+	
+	If ('{{ Env1 }}' -eq 'PRD' -or '{{ Env1 }}' -eq 'DR')
+	{
+		$MountResult = Mount-DiskImage D:\Install\SQL2014\en_sql_server_2014_enterprise_edition_x64_dvd_3932700.iso -PassThru
+		$DriveLetter = ($MountResult | Get-Volume).DriveLetter
+		$DriveLetter = $DriveLetter + ":"
+		cd $DriveLetter
+		
+		.\setup.exe /ConfigurationFile={{ NewFile }} /QUIETSIMPLE=False  /Q
+		
+		Dismount-DiskImage -ImagePath "D:\Install\SQL2014\en_sql_server_2014_enterprise_edition_x64_dvd_3932700.iso"
+	}
+	Else
+	{
+		$MountResult = Mount-DiskImage D:\Install\SQL2014\en_sql_server_2014_developer_edition_x64_dvd_3940406.iso -PassThru
+		$DriveLetter = ($MountResult | Get-Volume).DriveLetter
+		$DriveLetter = $DriveLetter + ":"
+		cd $DriveLetter
+		#.\Setup.exe /ConfigurationFile={{ NewFile }} /QUIETSIMPLE=False  /Q
+		.\Setup.exe /Q /ACTION=Install /IACCEPTSQLSERVERLICENSETERMS /ENU /UPDATEENABLED="false" /FEATURES="SQLENGINE,FullText,SSMS,ADV_SSMS" /INSTANCENAME="MSSQLSERVER" /SECURITYMODE="SQL" /SAPWD="{{ SaPw }}" /AGTSVCSTARTUPTYPE="automatic" /BROWSERSVCSTARTUPTYPE="automatic" /SQLSYSADMINACCOUNTS="{{ adminaccounts }}" /SQLBACKUPDIR="{{ BuPath }}" /SQLUSERDBDIR="{{ DataPath }}" /SQLUSERDBLOGDIR="{{ LogPath }}" /SQLTEMPDBDIR="{{ TempdbPath }}" /INSTALLSQLDATADIR="{{ SystemPath }}"
+		
+		Dismount-DiskImage -ImagePath "D:\Install\SQL2014\en_sql_server_2014_developer_edition_x64_dvd_3940406.iso"
+		
+	}
+}
+
+If ("{{ SqlVersion }}" -eq "2016")
+{
+	
+	If ('{{ Env1 }}' -eq 'PRD' -or '{{ Env1 }}' -eq 'DR')
+	{
+		$MountResult = Mount-DiskImage D:\Install\SQL2016\en_sql_server_2016_enterprise_x64_dvd_8701793.iso -PassThru
+		$DriveLetter = ($MountResult | Get-Volume).DriveLetter
+		$DriveLetter = $DriveLetter + ":"
+		cd $DriveLetter
+		
+		.\setup.exe /ConfigurationFile={{ NewFile }} /QUIETSIMPLE=False  /Q
+		
+		Dismount-DiskImage -ImagePath "D:\Install\SQL2016\en_sql_server_2016_enterprise_x64_dvd_8701793.iso"
+	}
+	Else
+	{
+		$MountResult = Mount-DiskImage D:\Install\SQL2016\en_sql_server_2016_developer_x64_dvd_8777069.iso -PassThru
+		$DriveLetter = ($MountResult | Get-Volume).DriveLetter
+		$DriveLetter = $DriveLetter + ":"
+		cd $DriveLetter
+		.\Setup.exe /ConfigurationFile={{ NewFile }} /QUIETSIMPLE=False  /Q
+		
+		Dismount-DiskImage -ImagePath "D:\Install\SQL2016\en_sql_server_2016_developer_x64_dvd_8777069.iso"
+		
+	}
+}
+
+If ("{{ SqlVersion }}" -eq "2017")
+{
+	If ('{{ Env1 }}' -eq 'PRD' -or '{{ Env1 }}' -eq 'DR')
+	{
+		$MountResult = Mount-DiskImage D:\Install\SQL2017\en_sql_server_2017_enterprise_x64_dvd_11293666.iso -PassThru
+		$DriveLetter = ($MountResult | Get-Volume).DriveLetter
+		$DriveLetter = $DriveLetter + ":"
+		cd $DriveLetter
+		
+		.\setup.exe /ConfigurationFile={{ NewFile }} /QUIETSIMPLE=False /Q
+		
+		Dismount-DiskImage -ImagePath "D:\Install\SQL2017\en_sql_server_2017_enterprise_x64_dvd_11293666.iso"
+	}
+	Else
+	{
+		$MountResult = Mount-DiskImage D:\Install\SQL2017\en_sql_server_2017_developer_x64_dvd_11296168.iso -PassThru
+		$DriveLetter = ($MountResult | Get-Volume).DriveLetter
+		$DriveLetter = $DriveLetter + ":"
+		cd $DriveLetter
+		.\Setup.exe /ConfigurationFile={{ NewFile }} /QUIETSIMPLE=False /Q
+		
+		Dismount-DiskImage -ImagePath "D:\Install\SQL2017\en_sql_server_2017_developer_x64_dvd_11296168.iso"
+		
+	}
+}

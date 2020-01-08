@@ -1,0 +1,43 @@
+- name: do as oracle_user
+  block:
+    - name: create cleanup_files.ctl for standalone
+      template:
+        src: standalone_cleanup_files.ctl.j2
+        dest: "{{ oracle_base }}/admin/ctl/cleanup_files.ctl"
+      when: 
+        - '(ansible_play_hosts | length) == 1'
+    
+    - name: create cleanup_files.ctl for cluster
+      template:
+        src: rac_cleanup_files.ctl.j2
+        dest: "{{ oracle_base }}/admin/ctl/cleanup_files.ctl"
+      when: 
+        - '(ansible_play_hosts | length) > 1'
+    
+    - name: Run Cleanup file job for Database
+      command: '{{ oracle_base }}/admin/scripts/cleanup_files.ksh'
+      register: cleanup_files
+      ignore_errors: true
+        
+    - name: save cleanup_files script stdout
+      copy:
+        dest: '{{ oracle_base }}/admin/logs/cleanup_files_{{ ansible_date_time.iso8601 }}.out'  
+        content: '{{ cleanup_files.stdout }}'
+    
+    - name: save cleanup_files script stderr
+      copy:
+        dest: "{{ oracle_base }}/admin/logs/cleanup_files_{{ ansible_date_time.iso8601 }}.err"
+        content: "{{ cleanup_files.stderr | default('') }}"
+      when: cleanup_files.stderr_lines | length > 0
+    
+    - name: create a crontab
+      cron:
+        name: "run cleanup_files.ksh"
+        user: "{{ oracle_user }}"
+        minute: "45"
+        hour: "1"
+        day: "*"
+        month: "*"
+        job: "{{ oracle_base }}/admin/scripts/cleanup_files.ksh > {{ oracle_base }}/logs/cleanup_files.ksh.log 2>&1"
+      when: cleanup_files.rc == 0
+  become_user: "{{ oracle_user }}"

@@ -1,0 +1,243 @@
+If ('{{ Domain }}' -eq 'TWCDMZ')
+{
+	$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'TWCDMZ\GG-MS-SQL-DBA')
+		DROP LOGIN [TWCDMZ\GG-MS-SQL-DBA] 
+		
+		CREATE LOGIN [TWCDMZ\GG-MS-SQL-DBA] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [TWCDMZ\GG-MS-SQL-DBA]
+        
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'TWCDMZ\SVSQLPRD')
+		DROP LOGIN [TWCDMZ\SVSQLPRD] 
+
+		CREATE LOGIN [TWCDMZ\SVSQLPRD] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [TWCDMZ\SVSQLPRD]
+
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'Admin')
+		DROP LOGIN [Admin]
+
+		CREATE LOGIN [Admin] WITH PASSWORD=N'{{ password }}', DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [Admin]
+
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]
+
+		--Add sa to system acct for backups
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [NT AUTHORITY\SYSTEM]"
+}
+If ('{{ Domain }}' -eq 'TWCCORP')
+{
+	$Qry = "--TWCCORP\GG-MS-SQL-DBA
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'TWCCORP\GG-MS-SQL-DBA')
+		DROP LOGIN [TWCCORP\GG-MS-SQL-DBA] 
+		
+		CREATE LOGIN [TWCCORP\GG-MS-SQL-DBA] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [TWCCORP\GG-MS-SQL-DBA]
+        
+		--TWCCORP\SVSQLPRD
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'TWCCORP\SVSQLPRD')
+		DROP LOGIN [TWCCORP\SVSQLPRD]        
+        
+        CREATE LOGIN [TWCCORP\SVSQLPRD] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [TWCCORP\SVSQLPRD]
+
+		--Admin
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'admin')
+		DROP LOGIN [admin] 
+
+		CREATE LOGIN [Admin] WITH PASSWORD=N'{{ password }}', DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [Admin]
+
+		--CHTR\Corp-DataCenterDBA
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CHTR\Corp-DataCenterDBA')
+		DROP LOGIN [CHTR\Corp-DataCenterDBA]
+
+		CREATE LOGIN [CHTR\Corp-DataCenterDBA] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CHTR\Corp-DataCenterDBA]
+
+		--CHTR\DB-ADMIN-SVC-ACCTS
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CHTR\DB-ADMIN-SVC-ACCTS')
+		DROP LOGIN [CHTR\DB-ADMIN-SVC-ACCTS]   
+        
+        CREATE LOGIN [CHTR\DB-ADMIN-SVC-ACCTS] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CHTR\DB-ADMIN-SVC-ACCTS]
+        		
+		--CHTR\svc_sqlmail
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CHTR\svc_sqlmail')
+		DROP LOGIN [CHTR\svc_sqlmail]   
+        
+        CREATE LOGIN [CHTR\svc_sqlmail] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CHTR\svc_sqlmail]
+
+		--NetIqMon
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'NetIqMon')
+		DROP LOGIN [NetIqMon]
+
+		CREATE LOGIN [NetIqMon] WITH PASSWORD=N'{{ netiqmon_pass }}', DEFAULT_DATABASE=[master], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [NetIqMon]
+
+		--BUILTIN\Administrators
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]
+
+		--Add sa to system acct for backups
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [NT AUTHORITY\SYSTEM]"
+}
+If ('{{ Domain }}' -eq 'CHTR')
+{
+	$Qry = "--Admin
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'admin')
+		DROP LOGIN [admin] 
+
+		CREATE LOGIN [Admin] WITH PASSWORD=N'{{ password }}', DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [Admin]
+
+		--CHTR\Corp-DataCenterDBA
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CHTR\Corp-DataCenterDBA')
+		DROP LOGIN [CHTR\Corp-DataCenterDBA]
+
+		CREATE LOGIN [CHTR\Corp-DataCenterDBA] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CHTR\Corp-DataCenterDBA]
+
+		--CHTR\DB-ADMIN-SVC-ACCTS
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CHTR\DB-ADMIN-SVC-ACCTS')
+		DROP LOGIN [CHTR\DB-ADMIN-SVC-ACCTS]   
+        
+        CREATE LOGIN [CHTR\DB-ADMIN-SVC-ACCTS] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CHTR\DB-ADMIN-SVC-ACCTS]
+        		
+		--NetIqMon
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'NetIqMon')
+		DROP LOGIN [NetIqMon]
+
+		CREATE LOGIN [NetIqMon] WITH PASSWORD=N'{{ netiqmon_pass }}', DEFAULT_DATABASE=[master], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [NetIqMon]
+
+		--BUILTIN\Administrators
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]
+
+		--Add sa to system acct for backups
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [NT AUTHORITY\SYSTEM]"
+}
+If ('{{ Domain }}' -eq 'DEV')
+{
+	$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'DEV\Corp-DataCenterDBA')
+		DROP LOGIN [DEV\Corp-DataCenterDBA]
+
+		CREATE LOGIN [DEV\Corp-DataCenterDBA] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [DEV\Corp-DataCenterDBA]
+
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'DEV\svc_sqlmail')
+		DROP LOGIN [DEV\svc_sqlmail] 
+
+		CREATE LOGIN [DEV\svc_sqlmail] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [DEV\svc_sqlmail]
+
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'admin')
+		DROP LOGIN [admin] 
+
+		CREATE LOGIN [Admin] WITH PASSWORD=N'{{ password }}', DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [Admin]
+
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'NetIqMon')
+		DROP LOGIN [NetIqMon]
+
+		CREATE LOGIN [NetIqMon] WITH PASSWORD=N'{{ netiqmon_pass }}', DEFAULT_DATABASE=[master], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [NetIqMon]
+
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]
+
+		--Add sa to system acct for backups
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [NT AUTHORITY\SYSTEM]"
+}
+If ('{{ Domain }}' -eq 'UAT')
+{
+	$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'UAT\Corp-DataCenterDBA')
+		DROP LOGIN [UAT\Corp-DataCenterDBA]
+
+		CREATE LOGIN [UAT\Corp-DataCenterDBA] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [UAT\Corp-DataCenterDBA]
+        
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'UAT\svc_sqlmail')
+		DROP LOGIN [UAT\svc_sqlmail]
+
+		CREATE LOGIN [UAT\svc_sqlmail] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [UAT\svc_sqlmail]
+
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'admin')
+		DROP LOGIN [admin] 
+
+		CREATE LOGIN [Admin] WITH PASSWORD=N'{{ password }}', DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [Admin]
+
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'NetIqMon')
+		DROP LOGIN [NetIqMon]
+
+		CREATE LOGIN [NetIqMon] WITH PASSWORD=N'{{ netiqmon_pass }}', DEFAULT_DATABASE=[master], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [NetIqMon]
+
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]
+
+		--Add sa to system acct for backups
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [NT AUTHORITY\SYSTEM]"
+}
+If ('{{ Domain }}' -eq 'Corp')
+{
+	$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CORP\{BHN-DBA}')
+		DROP LOGIN [CORP\{BHN-DBA}]
+
+		CREATE LOGIN [CORP\{BHN-DBA}] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CORP\{BHN-DBA}]
+ 
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CORP\sqlman')
+		DROP LOGIN [CORP\sqlman]
+
+        CREATE LOGIN [CORP\sqlman] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CORP\sqlman]
+
+		--Admin
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'admin')
+		DROP LOGIN [admin] 
+
+		CREATE LOGIN [Admin] WITH PASSWORD=N'{{ password }}', DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [Admin]
+
+		--CHTR\Corp-DataCenterDBA
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CHTR\Corp-DataCenterDBA')
+		DROP LOGIN [CHTR\Corp-DataCenterDBA]
+
+		CREATE LOGIN [CHTR\Corp-DataCenterDBA] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CHTR\Corp-DataCenterDBA]
+
+		--CHTR\DB-ADMIN-SVC-ACCTS
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CHTR\DB-ADMIN-SVC-ACCTS')
+		DROP LOGIN [CHTR\DB-ADMIN-SVC-ACCTS]   
+        
+        CREATE LOGIN [CHTR\DB-ADMIN-SVC-ACCTS] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CHTR\DB-ADMIN-SVC-ACCTS]
+        		
+		--CHTR\svc_sqlmail
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'CHTR\svc_sqlmail')
+		DROP LOGIN [CHTR\svc_sqlmail]   
+        
+        CREATE LOGIN [CHTR\svc_sqlmail] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [CHTR\svc_sqlmail]
+
+		--NetIqMon
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'NetIqMon')
+		DROP LOGIN [NetIqMon]
+
+		CREATE LOGIN [NetIqMon] WITH PASSWORD=N'{{ netiqmon_pass }}', DEFAULT_DATABASE=[master], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [NetIqMon]
+
+		--BUILTIN\Administrators
+		IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]
+
+		--Add sa to system acct for backups
+		ALTER SERVER ROLE [sysadmin] ADD MEMBER [NT AUTHORITY\SYSTEM]"
+}
+
+Invoke-SqlCmd -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}

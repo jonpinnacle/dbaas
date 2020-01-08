@@ -1,0 +1,31 @@
+---
+  
+- name: parse file
+  hosts: lab
+  become: yes
+
+###########################################################################################
+######################################## GOAL #############################################
+## trying to dynamically get the list of scripts to be run after 'runInstaller' finishes ##
+## This would make the grid_install.yml tasks more dynamic                               ##
+##                                                                                       ##
+## you'll need to run grid install (or have a server where one has ran) to get the file  ##
+###########################################################################################
+
+  vars:
+    file: /u01/tmp/12.1.0.2/grid_stdout.out
+    oracle_base: /u01/app
+    oracle_grid_home: /u01/app/12.1.0.2/grid
+
+  tasks:
+  - name: read_file
+    command: cat /u01/tmp/12.1.0.2/grid_stdout.out
+    register: grid_stdout
+
+  - debug:
+      msg: orainstRoot.sh found
+    when:  'oracle_base + "/oraInventory/orainstRoot.sh" in grid_stdout.stdout'
+
+  - debug:
+      msg: root.sh found
+    when: 'oracle_grid_home + "/root.sh" in grid_stdout.stdout'

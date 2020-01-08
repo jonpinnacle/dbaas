@@ -1,0 +1,13 @@
+---
+win_cluster_name: Cluster
+win_cluster_ip: 10.10.98.61
+required_features:
+  - Failover-clustering
+  - RSAT-Clustering-PowerShell
+  - RSAT-Clustering-CmdInterface
+
+retry_interval_sec: 10
+retry_count: 60
+
+domain_admin_username: administrator
+dns_domain_name: ad.getfamiliar.com

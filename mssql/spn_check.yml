@@ -1,0 +1,4 @@
+- name: Check for status of SPN
+  hosts: '{{ host }}'
+  roles:
+     - SPN-CHECK

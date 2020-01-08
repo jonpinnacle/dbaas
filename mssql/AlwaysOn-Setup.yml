@@ -1,0 +1,8 @@
+- name: AlwaysOn-Setup
+#  hosts: AlwaysOn-Setup
+  hosts: '{{ host }}'
+  tasks:
+    - name: AlwaysOn-Setup
+      import_role:
+        name: AlwaysOn-Setup
+      

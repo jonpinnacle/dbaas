@@ -1,0 +1,9 @@
+$software2016 = "SQL Server 2016 management studio";
+$software2017 = "Microsoft SQL Server management studio";
+$installed = (Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Where { ( $_.DisplayName -eq $software2016) -or ($_.DisplayName -eq $software2017) }) -ne $null
+
+If(-Not $installed) {
+Write-Host "FAIL";
+} else {
+Write-Host "PASS"
+}

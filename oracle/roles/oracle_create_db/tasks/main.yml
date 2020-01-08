@@ -1,0 +1,290 @@
+---
+- include_vars: secrets.yml
+  no_log: true
+
+- name: check if cluster is ok
+  environment: "{{ ora_user_env }}"
+  command: olsnodes -s
+  ignore_errors: yes
+  changed_when: false
+  register: crs_check
+  when: inventory_hostname == master_node
+  failed_when: '"Inactive" in crs_check.stdout'
+
+- name: check if db has already been installed
+  environment: "{{ ora_user_env }}"
+  command: srvctl status database -d {{ oracle_db_name }}
+  changed_when: false
+  register: oracle_installed
+  failed_when: "'command not found' in oracle_installed.stdout"
+- set_fact:
+    db_exists: "{% set err_check_msg = 'The resource for database ' +  oracle_db_name + ' could not be found.' %}
+                {%- if err_check_msg in oracle_installed.stdout -%}False
+                {%- else -%}True
+                {%- endif %}"
+
+- block:
+  - name: create tmp dir
+    file:
+      group: "{{ oracle_group }}"
+      owner: "{{ oracle_user }}"
+      path: "{{ oracle_tmp }}"
+      state: directory
+      recurse: yes
+
+  - name: create cluster_node_string
+    set_fact:
+      cluster_node_string: "{{ cluster_node_string | default([]) }} + [ '{{ hostvars[node_name]['ansible_hostname'] }}' ]"
+    loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+    loop_control:
+      loop_var: node_name
+
+  - name: copy 'charter.dbt' template file
+    copy:
+      owner: "{{ oracle_user }}"
+      src: charter.dbt
+      dest: "{{ oracle_home }}/assistants/dbca/templates/charter.dbt"
+    diff: false
+
+  - name: create 'create_db' rsp file
+    template:
+      owner: "{{ oracle_user }}"
+      src: "{%- if oracle_version == '12.1.0.2' -%}12c_create_db_rsp.j2
+            {%- elif  oracle_version  == '11.2.0.4' -%}11g_create_db_rsp.j2
+            {%- endif %}"
+      dest: "{{ oracle_tmp }}/create_db_{{ oracle_db_name }}.rsp"
+    diff: false
+
+  - name: db checklist status post for Create DB
+    import_role:
+      name: dbaas_api_services
+      tasks_from: db_checklist_status.yml
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_area: "DB INSTANCE CREATION"
+      task_id: "{{ ticket_ref }}"
+      task_status: "STARTED"
+      platform_vendor: "{{ PLATFORM_VENDOR }}"
+      task_message: "Creating Database {{ oracle_db_name }} "
+      standard_task_id: "{{ standard_task_id }}"
+    tags:
+    - apex_api
+
+  - block:
+    - name: create database
+      become: yes
+      become_user: "{{ oracle_user }}"
+      environment: "{{ ora_user_env }}"
+      shell: "time dbca -createDatabase -silent -responseFile {{ oracle_tmp }}/create_db_{{ oracle_db_name }}.rsp"
+      register: create_db
+      args:
+        executable: /bin/bash
+      failed_when: '"[FATAL]" in create_db.stdout or
+                    "failed to run command ‘dbca’" in create_db.stdout or
+                    "DBCA Operation failed." in create_db.stdout or
+                    create_db.rc != 0'
+      async: 86400
+      poll: 60
+      when: inventory_hostname == master_node
+
+    - name: db checklist status post for Create DB
+      import_role:
+        name: dbaas_api_services
+        tasks_from: db_checklist_status_file.yml
+      vars:
+        task_key: "{{ ansible_hostname }}"
+        task_area: "DB INSTANCE CREATION"
+        task_id: "{{ ticket_ref }}"
+        task_status: "UPLOAD Log"
+        task_message: "dbca log for Database {{ oracle_db_name }} "
+        file_mimetype: "text/plain"
+        record_type: "file_upload"
+        logfile_path: "{{ oracle_base }}/cfgtoollogs/dbca/{{ oracle_db_name }}/{{ oracle_db_name }}.log"
+        standard_task_id: "{{ standard_task_id }}"
+      when: inventory_hostname == master_node
+      tags:
+      - apex_api
+    rescue:
+    - name: db checklist status post for Create DB
+      import_role:
+        name: dbaas_api_services
+        tasks_from: db_checklist_status.yml
+      vars:
+        task_key: "{{ ansible_hostname }}"
+        task_area: "DB INSTANCE CREATION"
+        task_id: "{{ ticket_ref }}"
+        task_status: "FAILED"
+        task_message: "Creating Database {{ oracle_db_name }} "
+        standard_task_id: "{{ standard_task_id }}"
+      tags:
+      - apex_api
+
+    - name: Instance Creation Failed
+      fail:
+        msg: Creation of {{ oracle_db_name }} failed
+
+- name: db checklist status post for Create DB
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "DB INSTANCE CREATION"
+    task_id: "{{ ticket_ref }}"
+    task_status: "SUCCESSFUL"
+    task_message: "Creating Database {{ oracle_db_name }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+# - name: check if cluster is ok
+#   environment: "{{ ora_user_env }}"
+#   command: olsnodes -s
+#   ignore_errors: yes
+#   changed_when: false
+#   register: crs_check
+#   when: inventory_hostname == master_node
+#   failed_when: '"Inactive" in crs_check.stdout'
+
+# - name: check if db has already been installed
+#   environment: "{{ ora_user_env }}"
+#   command: srvctl status database -d {{ oracle_db_name }}
+#   changed_when: false
+#   register: oracle_installed
+#   failed_when: "'command not found' in oracle_installed.stdout"
+# - set_fact:
+#     db_exists: "{% set err_check_msg = 'The resource for database ' +  oracle_db_name + ' could not be found.' %}
+#                 {%- if err_check_msg in oracle_installed.stdout -%}False
+#                 {%- else -%}True
+#                 {%- endif %}"
+
+# - block:
+#   - include_role:
+#       name: oracle_api_services
+#       tasks_from: db_inventory_update.yml
+#     tags:
+#     - apex_api
+
+#   - name: create tmp dir
+#     file:
+#       group: "{{ oracle_group }}"
+#       owner: "{{ oracle_user }}"
+#       path: "{{ oracle_tmp }}"
+#       state: directory
+#       recurse: yes
+
+#   - name: create cluster_node_string
+#     set_fact:
+#       cluster_node_string: "{{ cluster_node_string | default([]) }} + [ '{{ hostvars[node_name]['ansible_hostname'] }}' ]"
+#     loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+#     loop_control:
+#       loop_var: node_name
+
+#   - name: copy 'charter.dbt' template file
+#     template:
+#       owner: "{{ oracle_user }}"
+#       src: charter.dbt.j2
+#       dest: "{{ oracle_home }}/assistants/dbca/templates/charter.dbt"
+#     diff: false
+
+#   - name: copy 'alter_db_params.sql' sql file
+#     template:
+#       owner: "{{ oracle_user }}"
+#       src: alter_db_params.sql
+#       dest: "{{ oracle_tmp }}/{{ oracle_db_name }}_alter_db_params.sql"
+#     diff: false
+#     when: db_params_changes
+
+#   - name: create 'create_db' rsp file
+#     template:
+#       owner: "{{ oracle_user }}"
+#       src: 12c_create_db_rsp.j2
+#       dest: "{{ oracle_tmp }}/create_db_{{ oracle_db_name }}.rsp"
+#     diff: false
+
+#   - import_role:
+#       name: oracle_api_services
+#       tasks_from: db_checklist_post_update.yml
+#     vars:
+#       chklst_json_body:
+#         new_entry: True
+#         checklist_type: " CREATE DATABASE {{ oracle_db_name }}"
+#         checklist_category: DB Creation
+#         db_install_status: "IN PROGRESS"
+#     tags:
+#     - apex_api
+
+#   - block:
+#     - name: create database
+#       become: yes
+#       become_user: "{{ oracle_user }}"
+#       environment: "{{ ora_user_env }}"
+#       shell: |
+#         nohup dbca -silent -responseFile {{ oracle_tmp }}/create_db_{{ oracle_db_name }}.rsp 2>&1 | tee {{ oracle_tmp }}/create_db_{{ oracle_db_name }}.out &
+#         sleep 30
+#         while true
+#         do
+#           c=$(ps -ef | grep -v grep | grep dbca | grep {{ oracle_db_name }} | grep java | wc -l)
+#           [ $c -eq 0 ] && break
+#           sleep 10
+#         done
+#       register: create_db
+#       args:
+#         executable: /bin/bash
+#       failed_when: '"[FATAL]" in create_db.stdout or
+#                     "failed to run command ‘dbca’" in create_db.stdout or
+#                     "DBCA Operation failed." in create_db.stdout or
+#                     create_db.rc != 0'
+#       when: inventory_hostname == master_node
+#   rescue:
+#     - import_role:
+#         name: oracle_api_services
+#         tasks_from: db_checklist_post_update.yml
+#       vars:
+#         chklst_json_body:
+#           new_entry: False
+#           db_install_status: "FAILED"
+#       tags:
+#       - apex_api
+
+#     - name: Instance Creation Failed
+#       fail:
+#       msg: Creation of {{ oracle_db_name }} failed
+
+# - import_role:
+#     name: oracle_api_services
+#     tasks_from: db_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: False
+#       db_install_status: "SUCCESSFUL"
+#   tags:
+#   - apex_api
+
+#   when: not db_exists
+
+# - import_role:
+#     name: oracle_api_services
+#     tasks_from: upload_log.yml
+#   vars:
+#     logfile_path: "{{ oracle_base }}/cfgtoollogs/dbca/{{ oracle_db_name }}/{{ oracle_db_name }}.log"
+#   tags:
+#   - apex_api
+
+#   - name: "run alter_db_params script"
+#     become: yes
+#     become_user: '{{ oracle_user }}'
+#     environment: "{{ ora_user_env }}"
+#     command: "sqlplus / as sysdba @{{ oracle_tmp }}/{{ oracle_db_name }}_alter_db_params.sql"
+#     register: alter_db_params
+#     when: db_params_changes
+
+#   - include_role:
+#       name: oracle_admin
+#       tasks_from: stop_db.yml
+#     vars:
+#       oracle_home: "{{ oracle_grid_home }}"
+#       oracle_db_name: "{{ oracle_db_name }}"
+#     when:
+#     - inventory_hostname == master_node
+#     - db_params_changes

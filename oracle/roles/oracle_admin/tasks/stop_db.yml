@@ -1,0 +1,11 @@
+---
+- name: stop database
+  environment: "{{ ora_user_env }}"
+  command: srvctl stop database -db  {{ oracle_db_name }} -o immediate 
+  when: 
+   - inventory_hostname == master_node
+   - oracle_db_name | length > 0
+
+- name: Wait for database to stop
+  pause:
+    seconds: 90

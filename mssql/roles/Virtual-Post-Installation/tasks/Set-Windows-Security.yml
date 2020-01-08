@@ -1,0 +1,82 @@
+---
+- name: Add the member to local Group
+  win_group_membership:
+    name: Administrators
+    members:
+      - '{{ UName }}'
+    state: present
+    
+- name: Add the TWCDMZ member to local Group
+  win_group_membership:
+    name: Administrators
+    members:
+      - "{{ twcdmzuser }}"
+    state: present
+  when: Domain == "TWCDMZ"
+  loop:
+  - twcdmz\gg-sitescope-admins
+  - twcdmz\GG-OpenView-Server Admin
+  loop_control:
+    loop_var: twcdmzuser
+    
+- name: Add the TWCCORP member to local Group
+  win_group_membership:
+    name: Administrators
+    members:
+      - "{{ twccorpuser }}"
+    state: present
+  when: Domain == "TWCCORP"
+  loop:
+  - twccorp\GG-css-tsg-sim
+  - twccorp\gg-ovow administrators
+  - twccorp\GG-OpenView-Server Admin
+  - CHTR\EG-SQLAdmins
+  - CHTR\svc_sqlmail
+  loop_control:
+    loop_var: twccorpuser
+
+- name: Add the CORP member to local Group
+  win_group_membership:
+    name: Administrators
+    members:
+      - "{{ Corpuser }}"
+    state: present
+  when: Domain == "Corp"
+  loop:
+  - CHTR\EG-SQLAdmins
+  - CHTR\svc_sqlmail
+  loop_control:
+    loop_var: Corpuser
+    
+# - name: Modify rights of user
+#   win_command: D:\Install\SQL-CFG\ntrights.exe -u "{{ UName }}" -m "{{ ansible_hostname }}" +r "{{ rights }}"
+#   loop:
+#   - SeLockMemoryPrivilege
+#   - SeManageVolumePrivilege
+#   - SeServiceLogonRight
+#   - SeAssignPrimaryTokenPrivilege
+#   - SeIncreaseQuotaPrivilege
+#   - SeImpersonatePrivilege
+#   loop_control:
+#       loop_var: rights
+
+- name: Modify rights of user
+  win_user_right: 
+   name: "{{ rights }}"
+   users: "{{ UName }}"
+   action: add
+  loop:
+  - SeLockMemoryPrivilege
+  - SeManageVolumePrivilege
+  - SeServiceLogonRight
+  - SeAssignPrimaryTokenPrivilege
+  - SeIncreaseQuotaPrivilege
+  - SeImpersonatePrivilege
+  loop_control:
+      loop_var: rights
+
+- name: regedit to PowerShell Security Fix
+  win_regedit: 
+    path: 'HKLM:\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.SqlServer.Management.PowerShell.sqlps{{ ext }}0'
+    name: ExecutionPolicy
+    data: Unrestricted

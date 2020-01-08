@@ -1,0 +1,28 @@
+---
+- name: Copy pfile to local
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  fetch:
+    src: '{{ oracle_home }}/dbs/{{ file }}'
+    dest: .
+  loop:
+  - 'init{{ oracle_db_name }}.ora'
+  - 'orapw{{ oracle_db_name }}'
+  loop_control:
+    loop_var: file
+  when: inventory_hostname == master_node
+
+- name: Copy from local to target
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  copy:
+    src: './{{ ansible_play_hosts[0] }}/{{ oracle_home }}/dbs/{{ file }}'
+    dest: '{{ oracle_home }}/dbs'
+  loop:
+  - 'init{{ oracle_db_name }}.ora'
+  - 'orapw{{ oracle_db_name }}'
+  loop_control:
+    loop_var: file
+  when: inventory_hostname != master_node 

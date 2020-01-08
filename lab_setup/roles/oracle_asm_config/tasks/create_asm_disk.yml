@@ -1,0 +1,34 @@
+---
+- name: set disk label
+  set_fact:
+    disk_label: "{{ disk_info.path | basename | regex_replace('ora--dg--([^-]*).*', '\\1') | upper }}"
+
+- name: create asm disk
+  command: oracleasm createdisk {{ disk_label }} {{ disk_info.path }}
+  args:
+    creates: "{{ asm_disk_location }}/{{ disk_label }}"
+  register: asm_create_result
+  ignore_errors: yes
+  when: inventory_hostname == master_node
+
+- name: chown asm disks
+  block:
+    - name: chown asm disks
+      file:
+        group: "{{ oracle_group }}"
+        owner: "{{ oracle_user }}"
+        path: "{{ asm_disk_location }}/{{ disk_label }}"
+        state: file
+  when:
+  - inventory_hostname == master_node
+  - asm_create_result.rc != 0
+
+- name: scan asm disks
+  command: oracleasm scandisks
+
+- name: confirm {{ disk_label }} is good
+  command: oracleasm querydisk {{ disk_label }}
+  register: disk_confirm
+  failed_when: "'is a valid ASM disk' not in disk_confirm.stdout"
+  when:
+  - inventory_hostname == master_node

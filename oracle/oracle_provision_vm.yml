@@ -1,0 +1,60 @@
+---
+ 
+- name: Oracle Provision VM
+  hosts: '{{ host }}'
+  become: yes
+  gather_facts: yes
+  tasks:
+
+  - import_role:
+      name: oracle_api_services
+      tasks_from: host_process_status
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_rec_type: "MESSAGE"
+      task_area: "{{ task_name }}"
+      task_id: "{{ ticket_ref }}"
+      task_status: "INPROGRESS"
+      task_message: "{{ task_name }} Task - Started "
+      task_body: ""
+      standard_task_id: "{{ standard_task_id }}"
+       
+  - import_role:
+      name: oracle_api_services
+      tasks_from: host_process_status
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_rec_type: "MESSAGE"
+      task_area: "{{ task_name }}"
+      task_id: "{{ ticket_ref }}"
+      task_status: "INPROGRESS"
+      task_message: "Condition True {{ task_name }}"
+      task_body: ""
+      standard_task_id: "{{ standard_task_id }}"
+    when: provision_vm
+
+  - import_role:
+      name: oracle_api_services
+      tasks_from: host_capacity_insertion
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_rec_type: "LOAD_JSON"
+      task_area: "HOST_CAPACITY"
+      task_id: "{{ ticket_ref }}"
+      task_status: "SUCCESS"
+      task_message: "Host Mount Info"
+      standard_task_id: "{{ standard_task_id }}"  
+
+  - import_role:
+      name: oracle_api_services
+      tasks_from: host_process_status
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_rec_type: "MESSAGE"
+      task_area: "{{ task_name }}"
+      task_id: "{{ ticket_ref }}"
+      task_status: "COMPLETE"
+      task_message: "{{ task_name }} Task - Ended "
+      task_body: ""
+      standard_task_id: "{{ standard_task_id }}"
+       

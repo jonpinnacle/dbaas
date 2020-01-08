@@ -1,0 +1,4 @@
+---
+# vars file for linux_discovery
+cluster_nodes: "{{ ansible_play_hosts }}"
+master_node: "{{ ansible_play_hosts | first }}"

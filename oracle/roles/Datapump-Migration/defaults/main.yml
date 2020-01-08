@@ -1,0 +1,29 @@
+---
+oracle_version: 12.1.0.2
+
+oracle_base: /u01/app/oracle
+
+# oracle_db_home: grid
+
+# location for temporary files
+oracle_tmp: /u01/tmp/{{ oracle_version }}
+
+oracle_user: oracle
+
+#Source DB deatils
+source_db_name: ''
+
+#Target DB details
+dest_db_name: ''
+  
+#######################################
+
+directory_name: datadump
+
+export_filename: latest_export_db
+
+logfile_name: dump
+
+#table_exists_action=<SKIP|REPLACE|APPEND>
+
+table_exists_action: APPEND

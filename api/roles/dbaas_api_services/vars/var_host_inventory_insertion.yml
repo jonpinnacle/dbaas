@@ -1,0 +1,32 @@
+---
+#host_code_check: "{% if clustered == 'Y' -%}{{ host_code | mandatory }}
+#              {%- else -%}
+#             {%- endif %}"
+
+#env_source_check: "{% if clustered == 'N' -%}{{ env_source | mandatory }}
+#             {%- else -%}{{ env_source | default('') }}
+#             {%- endif %}"
+
+host_inventory_insrt_body:
+  host_name: "{{ ansible_hostname }}"
+  network_type: "{{ network_type }}" # Possibly HostVar?
+  core_count: "{{ ansible_processor_cores * ansible_processor_count }}"
+  processor_config_speed: "{{ ansible_processor[2] | regex_replace('^.*@ (.*$)','\\1') }}"
+  server_model: "{{ ansible_product_version }}"
+  hardware_vendor: "{{ ansible_product_name | regex_replace('^([^ ]*).*','\\1') }}"
+  os_type_version: "{{ ansible_distribution_version }}"
+  processor_bit: "{{ ansible_architecture }}"
+  phy_virt: "{% if ansible_product_name == 'Virtual Platform' -%}VIRTUAL
+             {%- else -%}PHYSICAL
+             {%- endif %}"
+  dc_location: "{{ dc_location }}" # Needs to be set as a HostVar
+  global_zone_solaris: "{{ global_zone_solaris }}" # Possibly HostVar?
+  phy_memory: "{{ ansible_memtotal_mb }}"
+  server_monitoring_tool: "{{ server_monitoring_tool }}" # Possibly HostVar?
+  #host_code: "{{ host_code_check }}"
+  clustered: "{{ clustered }}"
+  os_type: "{% if ansible_os_family | lower == 'windows' -%}WINDOWS
+            {%- elif ansible_os_family | lower == 'solaris' -%}SOLARIS
+            {%- else -%}LINUX
+            {%- endif %}"
+  #env_source: "{{ env_source }}" # Possibly HostVar?

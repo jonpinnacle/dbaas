@@ -1,0 +1,9 @@
+---
+- name: Copy Install-updated-code file
+  win_template: 
+    src: ../templates/Install-updated-code.j2
+    dest: c:\Ansible\Temp\Install-updated-code.ps1
+
+- name: Run Install updated code
+  win_shell: |
+     c:\Ansible\Temp\Install-updated-code.ps1 > c:\Ansible\Logs\Install-updated-code.log

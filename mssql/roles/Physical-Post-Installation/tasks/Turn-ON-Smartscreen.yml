@@ -1,0 +1,9 @@
+---
+- name: Copy the SmartScreen Script
+  win_copy:
+    src: ../files/SmartScreenSettings-SQL2.ps1
+    dest: c:\Ansible\Temp\SmartScreenSettings-SQL2.ps1   
+
+- name: Turn ON Smartscreen
+  win_shell: |
+    C:\Ansible\Temp\SmartScreenSettings-SQL2.ps1 > C:\Ansible\Logs\SmartScreenSettings-SQL2.log

@@ -1,0 +1,43 @@
+---
+
+## Host Defaults
+network_type: ""
+dc_location: ""
+global_zone_solaris: "N/A"
+server_monitoring_tool: ""
+clustered: "Y"
+
+## Cluster Defaults
+cluster_type: RAC
+gi_current_patchset: ""
+
+## App Defaults
+application_name: ""
+business_unit: ""
+technical_contact: "" 
+tech_contact_email: ""
+app_desc: ""
+app_owner: ""
+app_owner_email: ""
+
+## DB Defaults
+db_environment: ""
+appliance: "N"
+database_role: "" 
+pci_required: ""
+sox_required: ""
+encryption_required: "" 
+dataguard: ""
+golden_gate: ""
+backup_enabled: "" 
+end_of_life: ""
+db_monitoring_tool: "" 
+monitoring: ""
+comments: ""
+instance_count: "1"
+db_source: ""
+dr_solution: ""
+dr_location: ""
+env_category: ""
+app_id: ""   
+storage_type: "ASM"

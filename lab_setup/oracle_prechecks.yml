@@ -1,0 +1,7 @@
+---
+- name: oracle_prechecks
+  hosts: '{{ host }}'
+  become: yes
+  tasks:
+  - import_role:
+      name: oracle_prechecks

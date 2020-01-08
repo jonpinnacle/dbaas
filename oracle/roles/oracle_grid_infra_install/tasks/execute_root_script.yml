@@ -1,0 +1,69 @@
+---
+- name: db checklist status post for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    standard_task_id: "{{ standard_task_id_val }}"
+    task_area: "Grid Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "IN_PROGRESS"
+    task_message: "Running root.sh for Grid Infrastructure on {{ ansible_hostname }} "
+  when:
+    - inventory_hostname == master_node
+    - 'oracle_grid_home + "/root.sh" in hostvars[master_node]["grid_install"]["stdout"]'
+  tags:
+  - apex_api
+
+- block:
+  - name: execute root.sh post-installation script
+    command: "{{ oracle_grid_home }}/root.sh"
+    register: root_script
+
+  always:
+  - name: save root script stdout
+    copy:
+      dest: "{{ oracle_tmp }}/root_script_grid.out"
+      content: "{{ root_script.stdout | default('') }}"
+    when: root_script.changed
+
+  - name: save root script  stderr
+    copy:
+      dest: "{{ oracle_tmp }}/root_script_grid.err"
+      content: "{{ root_script.stderr | default('') }}"
+    when: root_script.changed
+
+  ## Need to add a way to upload to a separate checklist_id for each node ##
+  - name: Get files in a folder
+    find:
+      paths: "{{ oracle_grid_home }}/install/"
+      patterns: "root_{{ ansible_hostname }}*.log"
+    register: log_files
+    tags:
+    - apex_api
+
+- name: db checklist status file upload for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status_file.yml
+  vars:
+    standard_task_id: "{{ standard_task_id_val }}"
+    task_key: "{{ ansible_hostname }}"
+    task_area: "GRID INSTALL"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload Grid Install Log"
+    task_message: "Grid Install Log {{ ansible_hostname }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    logfile_path:  "{{ log_files.files | sort(attribute='mtime',reverse=true) | first | json_query('path') }}"
+  tags:
+  - apex_api
+
+# - name: upload logs for execute root script
+#   include_tasks: upload_log.yml
+#   vars:
+#     logfile_path: "{{ log_files.files | sort(attribute='mtime',reverse=true) | first | json_query('path') }}"
+#     log_file_desc: grid_root.sh
+#   tags:
+#     - apex_api

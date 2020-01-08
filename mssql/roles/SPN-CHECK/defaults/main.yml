@@ -1,0 +1,4 @@
+ansible_tmp: C:\Ansible\Temp
+standard_task_id: "0"
+ticket_ref: "TEST123"
+apex_url: "https://apex-dev.techlab.com:8443/ords/invent2"

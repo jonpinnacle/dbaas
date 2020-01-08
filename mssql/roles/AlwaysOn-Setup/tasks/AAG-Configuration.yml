@@ -1,0 +1,11 @@
+---
+- name: Copy AAG-Configuration
+  win_template:
+    src: ../templates/AAG-Configuration.j2
+    dest: c:\Ansible\Temp\AAG-Configuration.ps1
+
+- name: Run AAG-Configuration
+  win_shell:
+    c:\Ansible\Temp\AAG-Configuration.ps1 > c:\Ansible\Logs\AAG-Configuration.log
+  register: checkAAGlog
+  failed_when: '"Failed" in checkAAGlog.stdout or checkAAGlog.stderr != "" '

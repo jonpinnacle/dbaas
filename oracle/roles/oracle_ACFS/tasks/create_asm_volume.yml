@@ -1,0 +1,30 @@
+---
+
+- name: create {{ diskgroup_vol }} Volume
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  ignore_errors: yes
+  command: asmcmd volcreate -G {{ diskgroup_name }} -s {{ diskgroup_size }}G --width 1M --column 8 {{ diskgroup_vol }}
+  register: diskgroup_vol_volume
+  failed_when: lookup('vars', 'diskgroup_vol_volume').stderr_lines | length > 0
+
+- name: save volume_{{ diskgroup_vol }}.out
+  copy:
+    dest: "{{ oracle_tmp }}/volume_{{ diskgroup_vol }}.out"
+    content: "{{ lookup('vars', 'diskgroup_vol_volume').stdout | default('') }}"
+  when: lookup('vars', 'diskgroup_vol_volume').changed
+
+- name: save volume_{{ diskgroup_vol }}.err
+  copy:
+    dest: "{{ oracle_tmp }}/volume_{{ diskgroup_vol }}.err"
+    content: "{{ lookup('vars', 'diskgroup_vol_volume').stderr | default('') }}"
+  when: 
+  - lookup('vars', 'diskgroup_vol_volume').changed
+  - lookup('vars', 'diskgroup_vol_volume').stderr_lines | length > 0
+
+- name: get {{ diskgroup_vol }} Volume Info
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  ignore_errors: yes
+  command: asmcmd volinfo -G {{ diskgroup_name }} {{ diskgroup_vol }}
+  register: vol_info

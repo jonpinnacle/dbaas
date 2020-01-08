@@ -1,0 +1,43 @@
+---
+- name: create the cluster verify directory to the oracle user
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}/cluster_verify"
+    state: directory
+    recurse: yes
+  register: cluster_verify_dir
+
+- name: create the path to store the cvupack file
+  file:
+    path: "{{ oracle_installer_path }}/GRID/{{ grid_version }}/cluvfy"
+    state: directory
+    recurse: yes
+
+- name: get cvupack installer files from S3
+  aws_s3:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    bucket: gfcloudsoftwarerepo
+    object: "ORACLE_DB/Archive/cvupack_Linux_x86_64.zip"
+    dest: "{{ oracle_installer_path }}/GRID/{{ grid_version }}/cluvfy/cvupack_Linux_x86_64.zip"
+    mode: get
+
+- name: unzip cluvfy
+  unarchive:
+    src: "{{ oracle_installer_path }}/GRID/{{ grid_version }}/cluvfy/cvupack_Linux_x86_64.zip"
+    dest: "{{ oracle_tmp }}/cluster_verify"
+    remote_src: yes
+    keep_newer: true
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0755
+    validate_certs: no
+  when: cluster_verify_dir.changed
+
+- name: install cvuqdisk
+  yum:
+    name: "{{ oracle_tmp }}/cluster_verify/cv/rpm/cvuqdisk-1.0.10-1.rpm"
+    state: present
+  environment:
+    CVUQDISK_GRP: "{{ oracle_group }}"

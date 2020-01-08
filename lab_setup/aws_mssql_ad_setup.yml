@@ -1,0 +1,7 @@
+---
+- name: prepare lab server for install
+  hosts: '{{ host }}'
+  gather_facts: False
+  tasks:
+  - import_role:
+      name: mssql_AD

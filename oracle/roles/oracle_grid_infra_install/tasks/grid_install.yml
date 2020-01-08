@@ -1,0 +1,232 @@
+---
+- name: find number of oracle grid homes
+  find:
+    paths: "{{ oracle_base }}/{{ grid_version }}"
+    file_type: directory
+    patterns: "grid_+"
+    use_regex: yes
+    recurse: no
+  register: number_of_oracle_grid_homes
+
+- name: set oracle grid home
+  set_fact:
+    oracle_grid_home: "{{ oracle_base }}/{{ grid_version }}/grid_{{ number_of_oracle_grid_homes.matched | int + 1  }}"
+
+# - name: testing oracle_grid_home
+#   debug: msg="Host is {{ oracle_grid_home }}"
+
+# - name: test  hostvars
+#   debug: msg="Host is {{ hostvars }}"
+
+
+
+- block:
+  - name: install grid
+    environment: "{{ ora_user_env }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
+    shell: |
+      nohup {{ oracle_tmp }}/grid/runInstaller -silent -force -ignorePrereq -ignoreSysPreReqs -responseFile {{ oracle_tmp }}/grid_install.rsp 2>&1 | tee {{ oracle_tmp }}/grid_stdout.out &
+      sleep 30
+      while true
+      do
+        c=$(ps -ef | grep -v grep | grep 'grid/install' | grep java | wc -l)
+        [ $c -eq 0 ] && break
+        sleep 10
+      done
+    args:
+      executable: /bin/bash
+      creates: "{{ oracle_grid_home }}/cfgtoollogs/configToolAllCommands"
+    register: grid_install
+    failed_when: '"[FATAL]" in grid_install.stdout or "Installation cannot continue" in grid_install.stdout or  grid_install.rc != 0'
+    when: inventory_hostname == master_node
+
+  - name: get install logfile
+    find:
+      paths: "{{ oracle_base }}/oraInventory/logs"
+      file_type: file
+      age: -10m
+      age_stamp: mtime
+      patterns: silentInstall\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}[AP]M.log
+      use_regex: yes
+    register: gi_install_log
+    when: inventory_hostname == master_node
+    tags:
+    - apex_api
+
+  # - name: upload logs for grid install
+  #   include_tasks: upload_log.yml
+  #   vars:
+  #     logfile_path: "{{ gi_install_log.files[0].path }}"
+  #     log_file_desc: grid install log
+  #   when:
+  #   - inventory_hostname == master_node
+  #   - gi_install_log.files[0] is defined
+  #   tags:
+  #   - apex_api
+
+  - name: db checklist status file upload for Grid Install
+    import_role:
+      name: dbaas_api_services
+      tasks_from: db_checklist_status_file.yml
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_area: "GRID INSTALL"
+      task_id: "{{ ticket_ref }}"
+      task_status: "Upload Grid Install Log"
+      task_message: "Grid Install Log {{ ansible_hostname }} "
+      file_mimetype: "text/plain"
+      record_type: "file_upload"
+      logfile_path: "{{ gi_install_log.files[0].path }}"
+      standard_task_id: "{{ standard_task_id_val }}"
+    when:
+      - inventory_hostname == master_node
+      - gi_install_log.files[0] is defined
+    tags:
+    - apex_api
+
+  - name: execute orainstRoot.sh script
+    block:
+    - name: execute orainstRoot.sh script
+      command: "{{ oracle_base }}/oraInventory/orainstRoot.sh"
+      register: orainstroot_script
+
+    - name: save orainstroot script stdout
+      copy:
+        dest: "{{ oracle_tmp }}/orainstroot_script_stdout.out"
+        content: "{{ orainstroot_script.stdout }}"
+      changed_when: False
+
+    - name: save orainstroot script  stderr
+      copy:
+        dest: "{{ oracle_tmp }}/orainstroot_script_stderr.err"
+        content: "{{ orainstroot_script.stderr }}"
+      changed_when: False
+      when: orainstroot_script.stderr_lines | length > 0
+    when:
+    - 'oracle_base + "/oraInventory/orainstRoot.sh" in hostvars[master_node]["grid_install"]["stdout"]'
+
+  - name: db checklist status post for Grid Install
+    import_role:
+      name: dbaas_api_services
+      tasks_from: db_checklist_status.yml
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      standard_task_id: "{{ standard_task_id_val }}"
+      task_area: "Grid Install"
+      task_id: "{{ ticket_ref }}"
+      task_status: "IN_PROGRESS"
+      task_message: "Running root.sh for Grid Infrastructure on {{ ansible_hostname }} "
+    when:
+      - inventory_hostname == master_node
+      - 'oracle_grid_home + "/root.sh" in hostvars[master_node]["grid_install"]["stdout"]'
+    tags:
+    - apex_api
+
+  - include_tasks: execute_root_script.yml
+    loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+    loop_control:
+      loop_var: curr_host
+    tags: root_script
+    when:
+    - 'oracle_grid_home + "/root.sh" in hostvars[master_node]["grid_install"]["stdout"]'
+    - inventory_hostname == curr_host
+
+  # - name: host checklist post update for grid install
+  #   include_tasks: host_checklist_post_update.yml
+  #   vars:
+  #     chklst_json_body:
+  #       new_entry: True
+  #       task_desc: 'EXECUTING root Upgrade for Grid'
+  #       checklist_type: 'GRID rootupgrade.sh'
+  #       host_name: "{{ ansible_hostname }}"
+  #       checklist_category: 'Install'
+  #       #ID: "{{ checklist_id }}"
+  #       gi_install_status: IN PROGRESS
+  #       ticket_ref: "{{ ticket_ref }}"
+  #   when:
+  #    -  inventory_hostname == master_node
+  #    - 'oracle_grid_home + "/rootupgrade.sh" in hostvars[master_node]["grid_install"]["stdout"]'
+  #   tags:
+  #   - apex_api
+
+  - name: db checklist status post for Grid Install
+    import_role:
+      name: dbaas_api_services
+      tasks_from: db_checklist_status.yml
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_area: "Grid Install"
+      task_id: "{{ ticket_ref }}"
+      task_status: "IN_PROGRESS"
+      standard_task_id: "{{ standard_task_id_val }}"
+      task_message: "Running root upgrade for Grid Infrastructure on {{ ansible_hostname }} "
+    when: inventory_hostname == master_node
+    tags:
+    - apex_api
+
+  - include_tasks: execute_rootupgrade_script.yml
+    loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+    loop_control:
+      loop_var: curr_host
+    tags: upgrade_script
+    when:
+    - 'oracle_grid_home + "/rootupgrade.sh" in hostvars[master_node]["grid_install"]["stdout"]'
+    - inventory_hostname == curr_host
+
+  - name: db checklist status post for Grid Install
+    import_role:
+      name: dbaas_api_services
+      tasks_from: db_checklist_status.yml
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_area: "Grid Install"
+      task_id: "{{ ticket_ref }}"
+      task_status: "IN_PROGRESS"
+      standard_task_id: "{{ standard_task_id_val }}"
+      task_message: "Running Configtool for Grid Infrastructure on {{ ansible_hostname }} "
+    when: inventory_hostname == master_node
+    tags:
+    - apex_api
+
+  - name: run grid configTool
+    environment: "{{ ora_user_env }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
+    shell: |
+      nohup {{ oracle_grid_home }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_tmp }}/grid_configTool.rsp 2>&1 | tee {{ oracle_tmp }}/config_stdout.out &
+      sleep 30
+      while true
+      do
+        c=$(ps -ef | grep -v grep | grep grid_configTool.rsp | grep java | wc -l)
+        [ $c -eq 0 ] && break
+        sleep 10
+      done
+    args:
+      executable: /bin/bash
+    register: configTool
+    failed_when: '"The action configuration has failed its perform method" in configTool.stdout'
+    when:
+    - inventory_hostname == master_node
+    - 'oracle_grid_home + "/cfgtoollogs/configToolAllCommands RESPONSE_FILE=<response_file>" in hostvars[master_node]["grid_install"]["stdout"]'
+
+  rescue:
+
+  - name: db checklist status post for Grid Install
+    import_role:
+      name: dbaas_api_services
+      tasks_from: db_checklist_status.yml
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_area: "Grid Install"
+      task_id: "{{ ticket_ref }}"
+      task_status: "FAILED"
+      standard_task_id: "{{ standard_task_id_val }}"
+      task_message: "Install Grid Infrastructure for {{ ansible_hostname }} "
+    when: inventory_hostname == master_node
+    tags:
+    - apex_api
+
+  - name: Install Failed
+    fail:
+      msg: GI Install Failed

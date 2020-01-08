@@ -1,0 +1,19 @@
+---
+
+- name: Execute PSU Patch
+  hosts: '{{ host }}'
+  any_errors_fatal: true
+  become: yes
+  tasks:
+  - import_role:
+      name: oracle_psu_patching
+
+## Required Vars
+# patch_file - The full name of the Patch file
+# patch_type - GRID or ORACLE (if combined use GRID)
+# opatch_version_required - The expected OPatch Version for this PSU (as returned by `opatch version`)
+# opatch_util_installer - The name of the zipfile at '/yum/source/ORACLE_DB/OPATCH/' 
+#                         to install the expected OPatch version
+
+## Optional Vars
+# opatch_flags - Any flags that need to be passed to the "opatchauto apply" command.

@@ -1,0 +1,17 @@
+---
+
+oracle_home: "{% if deinstall_product == 'database' -%}{{ oracle_base }}/product/{{ oracle_version }}/{{ oracle_db_home }}
+              {%- elif deinstall_product == 'grid' -%}{{ install_base }}/{{ oracle_version }}/grid
+              {%- endif %}"
+
+cluster_nodes: "{{ ansible_play_hosts }}"
+
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+rac_install: "{% if ansible_play_hosts | length > 1 -%}true
+              {%- else -%}false
+              {%- endif %}"
+
+oracle_user: oracle
+
+oracle_dba_group: dba

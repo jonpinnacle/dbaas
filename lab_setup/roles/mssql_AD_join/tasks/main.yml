@@ -1,0 +1,43 @@
+---
+# tasks file for mssql_AD_join
+- include_vars: secret.yml
+  no_log: True
+
+- name: set dns ip as fact
+  set_fact:
+    dns_ip: "{%- for host in play_hosts|sort -%}
+            {%- if hostvars[host]['win_role'] == 'ad' -%}{{ hostvars[host]['ansible_ip_addresses'][0] }}
+            {%- endif -%}
+            {%- endfor -%}"
+
+- name: set dns server
+  win_dns_client:
+    adapter_names: '*'
+    ipv4_addresses: "{{ dns_ip }}"
+
+- name: set the searchdomain
+  win_shell: "Set-DnsClientGlobalSetting -SuffixSearchList @('{{ dns_name }}')"
+
+- name: let the adapter set the dns server
+  pause:
+    minutes: 2
+  delegate_to: localhost
+  run_once: true
+
+- name: block for machines joining AD
+  block:
+  - name: join install
+    win_domain_membership:
+      dns_domain_name: "{{ dns_name }}"
+      hostname: "{{ inventory_hostname }}"
+      domain_admin_user: "{{ dom_admin }}@{{ dns_name }}"
+      domain_admin_password: "{{ win_initial_password }}"
+      state: domain
+    register: domain_state
+
+  - name: reboot server
+    win_reboot:
+      msg: "Installing AD. Rebooting..."
+      pre_reboot_delay: 15
+    when: domain_state.changed
+  when: win_role != 'ad'

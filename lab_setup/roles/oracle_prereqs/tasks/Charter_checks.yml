@@ -1,0 +1,189 @@
+---
+
+- name: setting the fact 
+  set_fact:
+     failed_checks: ""
+
+- name: check the version
+  shell: echo `uname -r | awk -F. '{print $1}'`
+  register: version_number
+
+- name: setting the fact 
+  set_fact:  
+    failed_checks: "{{ failed_checks | string }} the linux kernel version ,"
+  when: version_number.stdout | int < 3
+
+- name: check the total memory
+  shell: grep MemTotal /proc/meminfo | awk '{ print $2 }'
+  register: total_memory
+
+- name: setting the fact 
+  set_fact:  
+    failed_checks: "{{ failed_checks | string }} no sufficient (396868032M ) memory,"
+  when: total_memory.stdout | int < 396868032
+
+- name: check the swap size
+  shell: grep SwapTotal /proc/meminfo | awk '{ print $2 }'
+  register: swap_memory
+
+- name: setting the fact 
+  set_fact:  
+    failed_checks: "{{ failed_checks | string }} swap size should be more than 16384M for the 64GB RAM or more,"
+  when: swap_memory.stdout | int < 16384 and total_memory.stdout | int > 64000000
+
+- name: setting the fact 
+  set_fact:  
+    failed_checks: "{{ failed_checks | string }} swap size should be more than 32768M for the 256GB RAM or more,"
+  when: swap_memory.stdout < 32768 and total_memory.stdout | int > 256000000
+
+- name: check whether ssh service is running
+  shell: ps -ef | grep sshd | wc -l
+  register: process_id
+
+- name: setting the fact 
+  set_fact:  
+    failed_checks: "{{ failed_checks | string }} ssh process is not running,"
+  when: process_id.stdout | int == 1
+
+- name: check TMP directory
+  shell: echo `df -kh /tmp | awk 'NR == 2 { print $4 }' | awk -F 'G' '{print $1}'`
+  register: tmp_size
+
+- name: setting the fact 
+  set_fact:  
+    failed_checks: "{{ failed_checks | string }} TMP directory size should be more than 4GB, {{ tmp_size.stdout | int | round }}"
+  when: tmp_size.stdout | int | round < 4
+
+- name: check the RW permission for all 
+  shell: ls -lsrta /var |grep tmp | awk '{ print$2 }'
+  register: rw_permission
+
+- name: setting the fact 
+  set_fact:  
+    failed_checks:  "{{ failed_checks | string }} the directory /var should have drwxrwxrwt. permission,"
+  when: rw_permission.stdout!="drwxrwxrwt."
+
+
+- name: umask value checker
+  shell: umask
+  register: umask_value
+
+- name: setting the fact 
+  set_fact:  
+    failed_checks: "{{ failed_checks | string }} unmask value is neither 22 or 022 or 0022,"
+  when: umask_value.stdout | int != 22 or umask_value.stdout | int != 022 or umask_value.stdout | int != 0022
+
+
+- name: get ulimit value (soft files)
+  become: yes
+  become_user: "{{ oracle_user.name }}"
+  shell: ulimit -Sn
+  register: ulimit_value
+
+- name: check the ulimit value
+  set_fact:
+   failed_checks: "{{ failed_checks | string }} ulimit value should be 2047 for ulimit -Sn,"
+  when: ulimit_value.stdout | int != 2047
+
+- name: get ulimit value (hard files)
+  become: yes
+  become_user: "{{ oracle_user.name }}"
+  shell: ulimit -Hn
+  register: ulimit_value
+
+- name: check the ulimit value
+  set_fact:
+   failed_checks: "{{ failed_checks | string }} ulimit value should be 65536 for ulimit -Hn,"
+  when: ulimit_value.stdout | int != 65536
+
+- name: get ulimit value (hard procs)
+  become: yes
+  become_user: "{{ oracle_user.name }}"
+  shell: ulimit -Hu
+  register: ulimit_value
+
+- name: check the ulimit value
+  set_fact:
+   failed_checks: "{{ failed_checks | string }} ulimit value should be 16384 for ulimit -Hu,"
+  when: ulimit_value.stdout | int != 16384
+
+- name: get ulimit value (soft stack)
+  become: yes
+  become_user: "{{ oracle_user.name }}"
+  shell: ulimit -Ss
+  register: ulimit_value
+
+- name: check the ulimit value
+  set_fact:
+   failed_checks: "{{ failed_checks | string }} ulimit value should be 10240 for ulimit -Ss,"
+  when: ulimit_value.stdout | int != 10240
+
+- name: get ulimit value (hard stack)
+  become: yes
+  become_user: "{{ oracle_user.name }}"
+  shell: ulimit -Hs
+  register: ulimit_value
+
+- name: check the ulimit value
+  set_fact:
+   failed_checks: "{{ failed_checks | string }} ulimit value should be unlimited for ulimit -Hs,"
+  when: ulimit_value.stdout != "unlimited"
+
+- name: Get the Memory Detail of the Instance
+  shell: free -k | awk ' $1 == "Mem:" {print $2}'
+  register: Total_Ram_size
+
+- name: Get The Huge Page Total Size
+  shell: grep HugePages /proc/meminfo | awk ' $1 == "HugePages_Total:" {print $2}'
+  register: huge_page_total_size
+
+- name: Check The Huge Page Total Size
+  set_fact:
+    failed_checks: "{{ failed_checks | string }} Huge Page size should be half of the RAM size,"
+  when: huge_page_total_size.stdout | int < {{ (Total_Ram_size.stdout | int) / 2 }}
+
+- name: Get The Ignored Users In pbis
+  shell: cat /etc/pbis/user-ignore
+  ignore_errors: yes
+  register: pbis_ignored_users_in_srvr
+
+- name: Check The Ignored Users List In pbis
+  set_fact:
+    failed_checks: "{{ failed_checks | string }} user ->{{ ignored_user }} is not in pbis ignored user list, "
+  when: ignored_user not in pbis_ignored_users_in_srvr.stdout_lines
+  loop: "{{ pbis.ignored_users }}"
+  loop_control:
+    loop_var: ignored_user
+
+- name: Get The Ignored Group In pbis
+  shell: cat /etc/pbis/group-ignore
+  ignore_errors: yes
+  register: pbis_ignored_group_in_srvr
+
+- name: Check The Ignored Users List In pbis
+  set_fact:
+    failed_checks: "{{ failed_checks | string }} group --> {{ ignored_group }} is not in pbis ignored group list, "
+  when: ignored_group not in pbis_ignored_group_in_srvr.stdout_lines
+  loop: "{{ pbis.ignored_groups }}"
+  loop_control:
+    loop_var: ignored_group
+
+- name: Get Local Storage Filesystem Size
+  shell: df -h /u01 | awk 'NR == 2 { print $2 }' | awk -F 'G' '{print $1}'
+  register: local_disk_size
+
+- name: Check Local Storage Filesystem Size
+  set_fact:
+    failed_checks: "{{ failed_checks | string }} | size of local filesystem should be greater than 300GB"
+
+- debug:
+    var: failed_checks
+
+# - name: fail the tasks if the pre-requsites are not satisfied
+#   fail: 
+#     msg: The following pre-requesties are not met {{ failed_checks | string }}
+#   when: failed_checks!=""
+
+## Additional Checks from updated doc
+# /dev/shm
+# OS Filesystem Local Disks size

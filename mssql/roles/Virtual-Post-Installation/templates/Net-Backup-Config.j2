@@ -1,0 +1,95 @@
+IF ("{{ DC }}" -eq "NCE") { $NBMedia = "CHRL-NBUIT-001V-BN.CORPBACKNET.TWCABLE.COM" }
+IF ("{{ DC }}" -eq "NCW") { $NBMedia = "DNVR-NBUIT-001V.CORPBACKNET.TWCABLE.COM" }
+IF ("{{ DC }}" -eq "CDP") { $NBMedia = "NETBPMAS21V.CORPBACKNET.TWCABLE.COM" }
+
+# Update bkup.bch files
+Write-host "Update Net Backup bkup.bch files" -foregroundcolor "Cyan"
+$NewFile = "D:\Install\SQL-CFG\NetBackup\bkup.bch"
+
+(Get-Content D:\Install\SQL-CFG\NetBackup\bkup.bch) |
+Foreach-Object {
+    $_ -replace 'ChgMe-Host', "{{ ansible_hostname }}"
+} |
+Out-File $NewFile
+
+(Get-Content $NewFile) |
+Foreach-Object {
+    $_ -replace 'ChgMe_NB', $NBMedia
+} |
+Out-File $NewFile
+
+# Update bkup-incr.bch files
+Write-host "Update Net Backup bkup-incr.bch files" -foregroundcolor "Cyan"
+$NewFile = "D:\Install\SQL-CFG\NetBackup\bkup-incr.bch"
+
+(Get-Content D:\Install\SQL-CFG\NetBackup\bkup-incr.bch) |
+Foreach-Object {
+    $_ -replace 'ChgMe-Host', "{{ ansible_hostname }}"
+} |
+Out-File $NewFile
+
+(Get-Content $NewFile) |
+Foreach-Object {
+    $_ -replace 'ChgMe_NB', $NBMedia
+} |
+Out-File $NewFile
+
+# Update tlog.bch files
+Write-host "Update Net Backup tlog.bch files" -foregroundcolor "Cyan"
+$NewFile = "D:\Install\SQL-CFG\NetBackup\tlog.bch"
+
+(Get-Content D:\Install\SQL-CFG\NetBackup\tlog.bch) |
+Foreach-Object {
+    $_ -replace 'ChgMe-Host', "{{ ansible_hostname }}"
+} |
+Out-File $NewFile
+
+(Get-Content $NewFile) |
+Foreach-Object {
+    $_ -replace 'ChgMe_NB', $NBMedia
+} |
+Out-File $NewFile
+
+$cn = new-object system.data.SqlClient.SqlConnection("server={{ ansible_hostname }};database=master;Integrated Security=true;");
+$cn.Open()
+# Fetch Server list into the Data source from Srv.ServerList Table from CentralDB
+$ds = new-object "System.Data.DataSet" "dtDbList"
+$q = "SELECT name from sys.databases WHERE recovery_model_desc = 'SIMPLE' and name NOT IN ('master','msdb');"
+$da = new-object "System.Data.SqlClient.SqlDataAdapter" ($q, $cn)
+$da.Fill($ds)
+$cn.Close()
+$dtDbList = $ds.Tables[0]
+$DbList = $dtDbList | Select name
+
+$DbList | foreach {
+    $Db = $_
+    
+    $DbName = $Db.name
+    $DbUpt = "EXCLUDE `"$DbName`""
+    
+    $DbName
+    $DbUpt
+    
+    $NewContent = Get-Content -Path $NewFile |
+    
+    ForEach-Object {
+        # If line matches regex
+        if ($_ -match ('^' + [regex]::Escape('DATABASE $ALL')))
+        {
+            # Output this line to pipeline
+            $_
+            
+            # And output additional line right after it
+            $DbUpt
+        }
+        else # If line doesn't matches regex
+        {
+            # Output this line to pipeline
+            $_
+        }
+    }
+    # Write content of $NewContent varibale back to file
+    $NewContent | Out-File -FilePath $NewFile -Encoding Default -Force
+}
+
+Copy-Item "D:\Install\SQL-CFG\NetBackup\*.bch" "C:\Program Files\Veritas\NetBackup\DbExt\MsSql"

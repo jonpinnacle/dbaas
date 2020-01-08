@@ -1,0 +1,18 @@
+---
+
+- include_role:
+    name: oracle_ACFS
+  vars:
+    create_exp_diskgroup: False
+    create_gg_diskgroup: True
+
+- name: create tmp dir
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}"
+    state: directory
+    recurse: yes
+
+- include_tasks: install_golden_gate.yml
+  when: inventory_hostname == master_node

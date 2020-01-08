@@ -1,0 +1,71 @@
+---
+
+oracle_user: oracle
+
+oracle_groups:
+- oinstall
+- dba
+
+installation_type: "{% if ansible_play_hosts | length > 1 -%}rac
+                    {%- else -%}standalone
+                    {%- endif %}"
+
+pbis:
+    ignored_users:
+        - root
+        - oracle
+    ignored_groups:
+        - tty
+        - root
+        - oinstall
+        - dba
+
+asm_disk_location: /dev/oracleasm/disks
+
+# DATA and RECO disks will be varied depending on the operational incremental expansions
+asm_data_pattern: D*
+
+asm_reco_pattern: R*
+
+asm_exp_pattern: EXP*
+
+asm_gg_pattern: GG*
+
+asm_ocr_pattern: GRID_DISK*
+
+kernel_parameters:
+    kernel_sem: "250 32000 100 128"
+    fs_aio_max_nr: "3145728"
+    net_ipv4_ip_local_port_range: "9000 65500"
+    net_core_rmem_default: "262144"
+    net_core_rmem_max: "4194304"
+    net_core_wmem_default: "262144"
+    net_core_wmem_max: "1048576"
+    fs_file_max: "13631488"
+    kernel_shmmax: "4398046511104"
+    kernel_shmall: "1073741824"
+    kernel_shmmni: "4096"
+
+    
+
+required_rpms:
+  - binutils
+  - compat-libcap1
+  - gcc
+  - gcc-c++
+  - glibc
+  - glibc-devel
+  - ksh
+  - libaio
+  - libaio-devel
+  - libgcc
+  - libstdc++
+  - libstdc++-devel
+  - libXi
+  - libXtst
+  - make
+  - sysstat
+  - compat-libstdc++-33
+  - kmod
+
+

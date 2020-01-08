@@ -1,0 +1,40 @@
+---
+
+- import_tasks: copy_archives.yml
+
+- name: run preupgrd.sql script for {{ oracle_db_name }}
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: sqlplus / as sysdba @{{ oracle_tmp }}/db_precheck/preupgrd.sql
+  failed_when: '"Could not proceed with Upgrade due to errors." in precheck_script.stdout'
+  register: precheck_script
+
+- name: save stdout
+  copy:
+    dest: "{{ oracle_tmp }}/preupgrd.sql.out"
+    content: "{{ precheck_script.stdout }}"
+
+- name: save stderr
+  copy:
+    dest: "{{ oracle_tmp }}/preupgrd.sql.err"
+    content: "{{ precheck_script.stderr }}"
+
+- name: get preupgrade log
+  slurp:
+    src: "{{ oracle_base }}/cfgtoollogs/{{ oracle_db_name }}/preupgrade/preupgrade.log"
+  register: preupgrade_log
+
+- name: get result counts
+  set_fact:
+    precheck_results_count: {
+      errors: "{{ preupgrade_log.content | b64decode | regex_search('[0-9]* ERROR') | regex_search('[0-9]*') }}",
+      warnings: "{{ preupgrade_log.content | b64decode | regex_search('[0-9]* WARNING') | regex_search('[0-9]*') }}",
+      informational: "{{ preupgrade_log.content | b64decode | regex_search('[0-9]* INFORMATIONAL') | regex_search('[0-9]*') }}"
+    }
+
+- name: execute pre-fixup
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: sqlplus / as sysdba @{{ oracle_base }}/cfgtoollogs/{{ oracle_db_name }}/preupgrade/preupgrade_fixups.sql
+  register: pre-fixup_script
+  when: execute_pre_fixup | lower == 'true' and precheck_results_count.errors | int > 0

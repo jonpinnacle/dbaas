@@ -1,0 +1,139 @@
+---
+
+- name: create "{{ diskgroup.dir }}" directory
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_base }}/{{ diskgroup.dir }}"
+    state: directory
+
+- name: As oracle (on primary node if RAC)
+  block:
+  - include_tasks: create_asm_diskgroup.yml
+    vars:
+      diskgroup_name: "{{ diskgroup.name }}"
+    when: diskgroup.name not in asm_disks
+
+  - name: get {{ diskgroup.vol }} Volume Info
+    become_user: "{{ oracle_user }}"
+    environment: "{{ ora_user_env }}"
+    changed_when: false
+    command: asmcmd volinfo -G {{ diskgroup.name }} {{ diskgroup.vol }}
+    register: vol_info
+
+  - include_tasks: create_asm_volume.yml
+    vars:
+      diskgroup_name: "{{ diskgroup.name }}"
+      diskgroup_vol: "{{ diskgroup.vol }}"
+      diskgroup_size: "{{ diskgroup.size }}"
+    when: "'not found in diskgroup' in vol_info.stdout"
+
+  - name: get dev_path
+    set_fact:
+      dev_path:  "{{ vol_info.stdout |
+                    regex_search('Volume Device:.*') |
+                    regex_replace('Volume Device:(.*)','\\1') }}"
+    failed_when: dev_path == ''
+
+  - name: check "acfs" file system
+    shell: |
+      set -o pipefail
+      echo no |fsck -n -t acfs /dev/asm/exp_fs_vol-464
+    args:
+      executable: /bin/bash
+    changed_when: False
+    ignore_errors: yes
+    register: acfs_check
+
+  - name: creating "acfs" file system
+    command: /sbin/mkfs -t acfs -f {{ dev_path }}
+    when: acfs_check is failed
+    ###################################################################
+    ## 'filesystem' module doesn't currently support ACFS            ##
+    ## The commented task below will work once that support is added ##
+    ###################################################################
+    # filesystem:
+    #   fstype: acfs
+    #   dev: "{{ dev_path }}"
+
+  - name: "mount {{ dev_path }} filesystem"
+    #command: /bin/mount -t acfs -o gid={{ oracle_group }},uid={{ oracle_user }} {{ dev_path }} {{ oracle_base }}/{{ diskgroup.dir }}
+    command: /bin/mount -t acfs {{ dev_path }} {{ oracle_base }}/{{ diskgroup.dir }}
+    # environment: "{{ ora_user_env }}"
+    # command: srvctl add filesystem -d {{ dev_path }} -m {{ oracle_base }}/{{ diskgroup.dir }} -u {{ oracle_user }} -fstype ACFS -autostart ALWAYS
+    ###################################################################
+    ## 'mount' module doesn't currently support ACFS                 ##
+    ## The commented task below will work once that support is added ##
+    ###################################################################
+    # mount:
+    #   path: {{ oracle_base }}/{{ diskgroup.dir }}
+    #   src: {{ dev_path }}
+    #   fstype: acfs
+    #   state: present
+
+  - name: "set ownership/perms on {{ oracle_base }}/{{ diskgroup.dir }}"
+    file:
+      #path: "{{ dev_path }}"
+      path: "{{ oracle_base }}/{{ diskgroup.dir }}"
+      owner: "{{ oracle_user }}"
+      group: "{{ oracle_group }}"
+      state: directory
+      mode: 0755
+  when: inventory_hostname == master_node
+
+- name: Mount on additional nodes (if any)
+  block:
+  - name: "get {{ diskgroup_vol }} Volume Info"
+    become_user: "{{ oracle_user }}"
+    environment: "{{ ora_user_env }}"
+    ignore_errors: yes
+    command: "asmcmd volinfo -G {{ diskgroup.name }} {{ diskgroup.vol }}"
+    register: vol_info
+
+  - name: set dev_path
+    set_fact:
+      dev_path:  "{{ vol_info.stdout |
+                    regex_search('Volume Device:.*') |
+                    regex_replace('Volume Device:(.*)','\\1') }}"
+    failed_when: dev_path == ''
+
+  - name: add mount_asm_diskgroup.sql script
+    template:
+      src: mount_asm_diskgroup.sql.j2
+      dest: "{{ oracle_tmp }}/mount_{{ diskgroup.dir }}_disk.sql"
+
+  - name: mount ACFS disk in ASM
+    become_user: '{{ oracle_user }}'
+    environment: "{{ ora_user_env }}"
+    command: sqlplus / as sysasm @{{ oracle_tmp }}/mount_{{ diskgroup.dir }}_disk.sql
+
+  ###################################################################
+  ## 'mount' module doesn't currently support ACFS                 ##
+  ## The commented task below will work once that support is added ##
+  ###################################################################
+  # - name: mount directories...
+  #   mount:
+  #     name: "{{ oracle_base }}/{{ diskgroup.dir }}"
+  #     src: "{{ dev_path }}"
+  #     fstype: acfs
+  #     opts: defaults,relatime
+  #     state: mounted
+  #   become: yes
+  #   when:
+  #   - rac_install
+  #   - inventory_hostname != master_node
+
+  - name: Mount the disk
+    command: '/bin/mount -t acfs {{ dev_path }} {{ oracle_base }}/{{ diskgroup.dir }}'
+
+  - name: "set ownership/perms on {{ oracle_base }}/{{ diskgroup.dir }}"
+    file:
+      #path: "{{ dev_path }}"
+      path: "{{ oracle_base }}/{{ diskgroup.dir }}"
+      owner: "{{ oracle_user }}"
+      group: "{{ oracle_group }}"
+      state: directory
+      mode: 0755
+  when:
+  - rac_install
+  - inventory_hostname != master_node

@@ -1,0 +1,16 @@
+import-module activedirectory
+
+set-location ad:
+
+$cluster = "{{ cluster_name }}"
+$listener = "{{ listner_name }}"
+
+$results = $null
+$results = Get-ADComputer $listener -Properties Distinguishedname
+
+if ($results -eq $null)
+{write-host "Failure: Listener name is not in AD"
+}
+else
+{write-host "Success: Listener name is in AD"
+}

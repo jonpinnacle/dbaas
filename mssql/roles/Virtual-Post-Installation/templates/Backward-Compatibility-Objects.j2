@@ -1,0 +1,24 @@
+Function Get-InstalledApps
+{
+	if ([IntPtr]::Size -eq 4)
+	{
+		$regpath = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
+	}
+	else
+	{
+		$regpath = @(
+			'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
+			'HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+		)
+	}
+	Get-ItemProperty $regpath | .{process { if ($_.DisplayName -and $_.UninstallString) { $_ } } } | Select DisplayName, Publisher, InstallDate, DisplayVersion, UninstallString | Sort DisplayName
+}
+$appToMatch = 'Microsoft SQL Server 2005 Backward compatibility'
+$result = Get-InstalledApps | where { $_.DisplayName -like $appToMatch }
+
+If ($result -eq $null)
+{
+	$cmd = "msiexec"
+	$arg = "/i D:\Install\SQLServer2005_BC_x64.msi /quiet /norestart"
+	start-process -Verb runAs -wait $cmd $arg
+}

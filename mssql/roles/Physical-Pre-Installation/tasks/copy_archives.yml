@@ -1,0 +1,68 @@
+---
+- win_get_url:
+    url: '{{ bin_server }}/{{ item }}'
+    dest: "{{ ansible_tmp }}"
+    validate_certs: no
+    force: no
+  loop:
+#  - IseriesDriver.zip
+#  - Oracle Client.zip
+  - SQL{{ SqlVersion }}.zip
+  - SQL-CFG.zip
+  - SQLServer2005_BC_x64.zip
+
+
+#- name: Unzip IseriesDriver.zip
+#  win_unzip:
+#    src: '{{ ansible_tmp }}\IseriesDriver.zip'
+#    dest: '{{ installer_location }}'
+#    creates: '{{ installer_location }}/IseriesDriver'
+
+#- name: Delete zip archives after unzipping
+#  win_file:
+#    state: absent
+#    path: "{{ ansible_tmp }}/IseriesDriver.zip"
+
+#- name: Unzip Oracle Client.zip
+#  win_unzip:
+#    src: '{{ ansible_tmp }}\Oracle Client.zip'
+#    dest: '{{ installer_location }}'
+#    creates: '{{ installer_location }}/Oracle Client'
+
+#- name: Delete zip archives after unzipping
+#  win_file:
+#    state: absent
+#    path: "{{ ansible_tmp }}/Oracle Client.zip"
+
+- name: Unzip SQL.zip
+  win_unzip:
+    src: '{{ ansible_tmp }}\SQL{{ SqlVersion }}.zip'
+    dest: '{{ installer_location }}'
+    creates: '{{ installer_location }}/en_sql_server_2014_developer_edition_x64_dvd_3940406.iso'
+
+- name: Delete zip archives after unzipping
+  win_file:
+    state: absent
+    path: "{{ ansible_tmp }}/SQL{{ SqlVersion }}.zip"
+
+- name: Unzip SQL-CFG.zip
+  win_unzip:
+    src: '{{ ansible_tmp }}\SQL-CFG.zip'
+    dest: '{{ installer_location }}'
+    creates: '{{ installer_location }}/SQL-CFG'
+
+- name: Delete zip archives after unzipping
+  win_file:
+    state: absent
+    path: "{{ ansible_tmp }}/SQL-CFG.zip"
+
+- name: Unzip SQLServer2005_BC_x64.zip
+  win_unzip:
+    src: '{{ ansible_tmp }}\SQLServer2005_BC_x64.zip'
+    dest: '{{ installer_location }}'
+    creates: '{{ installer_location }}/SQLServer2005_BC_x64.msi'
+
+- name: Delete zip archives after unzipping
+  win_file:
+    state: absent
+    path: "{{ ansible_tmp }}/SQLServer2005_BC_x64.zip"

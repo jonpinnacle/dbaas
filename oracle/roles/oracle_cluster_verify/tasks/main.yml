@@ -1,0 +1,11 @@
+---
+- include_vars: secrets.yml
+  no_log: True
+
+- include_tasks: setup_ssh_user_equivalency.yml
+  when: setup_ssh_user_equivalency
+
+- include_tasks: copy_archives.yml
+
+- include_tasks: run_cluvfy.yml
+  when: inventory_hostname == master_node

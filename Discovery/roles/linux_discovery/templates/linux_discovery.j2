@@ -1,0 +1,95 @@
+#jinja2: trim_blocks:False, lstrip_blocks:True
+{%- set glob_active_int = {'count':0} -%}
+{%- set glob_ipv4 = [] -%}
+{%- set glob_ipv6 = [] -%}
+{%- set glob_tmp = {'exists':False} -%}
+{%- set glob_mnt = {'size':0} -%}
+{ "hostname":"{{ ansible_hostname }}",
+  "OS_version":"{{ ansible_distribution }}:{{ ansible_distribution_major_version }}",
+  "kernel_version":"{{ ansible_kernel }}",
+  {%- if ansible_default_ipv4.gateway is defined %}
+  "gateway":"{{ ansible_default_ipv4.gateway }}",
+  {%- else %}
+  "gateway":"",
+  {%- endif %}
+  "domain":"{{ ansible_domain }}",
+  {%- if ansible_interfaces is defined -%}
+  {%- for interface in ansible_interfaces -%}
+    {%- if interface != 'lo' -%}
+      {%- set an_int = "ansible_" + interface|replace("-", "_") -%}
+      {%- for key, val in hostvars[inventory_hostname][an_int|string].iteritems() -%}
+        {%- if key == 'active' and val -%}
+           {%- set _ = glob_active_int.update({'count':glob_active_int['count'] +1}) -%}
+        {%- endif -%}
+      {%- endfor %}
+    {%- endif -%}
+  {%- endfor %}
+  "active_nics_number":{{ glob_active_int['count'] }},
+  "active_nics": [
+  {%- for interface in ansible_interfaces -%}
+  {%- set glob_ipv4 = [] -%}
+  {%- set glob_ipv6 = [] -%}
+    {%- if interface != 'lo' -%}
+      {%- set an_int = "ansible_" + interface|replace("-", "_") -%}
+      {%- for key, val in hostvars[inventory_hostname][an_int|string].iteritems() -%}
+        {%- if key == 'active' and val %}
+      {
+          {%- for key, val in hostvars[inventory_hostname][an_int|string].iteritems() -%}
+            {%- if key == 'device' %}
+       "label":"{{ interface }}",
+            {%- endif -%}
+            {%- if key == 'ipv4' -%}
+               {%- set _ = glob_ipv4.append(val['address']) -%}
+               {%- for key, val in hostvars[inventory_hostname][an_int|string].iteritems() -%}
+                 {%- if key == 'ipv4_secondaries' -%}
+                   {%- for ip in val -%}
+                     {%- set _ = glob_ipv4.append(ip['address']) -%}
+                   {%- endfor -%}
+                 {%- endif -%}
+               {%- endfor -%}
+            {%- endif -%}
+            {%- if key == 'ipv6' -%}
+              {%- for ip in val -%}
+                {%- set _ = glob_ipv6.append(ip['address']) -%}
+              {%- endfor -%}
+            {%- endif %}
+          {%- endfor %}
+       "ipv4":"{{ glob_ipv4|join(' ') }}",
+       "ipv6":"{{ glob_ipv6|join(' ') }}"
+          {%- if glob_active_int['count'] == 1 %}
+      }
+          {%- endif -%}
+          {%- if glob_active_int['count'] > 1 %}
+      },
+            {%- set _ = glob_active_int.update({'count':glob_active_int['count'] -1}) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endfor %}
+    {%- endif -%}
+  {%- endfor %}
+  ],
+  {%- else %}
+  "active_nics": "",
+  {%- endif %}
+  "cores":{{ ansible_processor_cores }},
+  "sockets":{{ ansible_processor_count }},
+  "memory":{{ ansible_memtotal_mb }},
+  "swap":{{ ansible_swaptotal_mb }},
+  "kernel_params":"{{ ansible_cmdline|join(' ') }}",
+  "ulimit":"TBD",
+  {%- for mount in ansible_mounts -%}
+    {%- if mount['mount'] == '/' %}
+  "root_fs":{{ mount['size_total'] }},
+      {%- set _ = glob_mnt.update({'size':mount['size_total']}) -%}
+    {%- endif -%}
+  {% endfor %}
+  {%- for mount in ansible_mounts -%}
+    {%- if mount['mount'] == '/tmp' %}
+  "tmp_fs":{{ mount['size_total'] }}
+      {%- set _ = glob_tmp.update({'exists':True}) -%}
+    {%- endif -%}
+  {% endfor %}
+  {%- if not glob_tmp['exists'] %}
+  "tmp_fs":{{ glob_mnt['size'] }}
+  {%- endif %}
+}

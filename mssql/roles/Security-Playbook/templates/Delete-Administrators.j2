@@ -1,0 +1,39 @@
+If ('{{ Domain }}' -eq 'TWCDMZ')
+{
+		$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]"
+}
+If ('{{ Domain }}' -eq 'TWCCORP')
+{
+
+		$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]"
+}
+If ('{{ Domain }}' -eq 'CHTR')
+{
+		$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]"
+
+}
+If ('{{ Domain }}' -eq 'DEV')
+{
+
+		$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]"
+}
+If ('{{ Domain }}' -eq 'UAT')
+{
+
+		$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]"
+}
+If ('{{ Domain }}' -eq 'Corp')
+{
+
+		$Qry = "IF  EXISTS (SELECT * FROM sys.server_principals WHERE name = N'BUILTIN\Administrators')
+		DROP LOGIN [BUILTIN\Administrators]"
+}
+
+Invoke-SqlCmd -query $Qry -serverinstance "{{ ansible_hostname }}" -database "master" -username "sa" -password "{{ SaPw }}"
+
+Invoke-SqlCmd -query "ALTER LOGIN [sa] WITH PASSWORD=N'{{ SaPwNew }}'" -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}

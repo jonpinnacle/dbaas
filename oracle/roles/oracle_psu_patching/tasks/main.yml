@@ -1,0 +1,217 @@
+---
+- include_vars: secrets.yml
+  no_log: True
+
+# - name: host checklist post for Patching
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: True
+#       host_name: "{{ ansible_hostname }}"
+#       db_name: "{{ oracle_db_name }}"
+#       checklist_type: PATCHING
+#       checklist_category: Install
+#       db_install_status: STARTED
+#       ticket_ref: "{{ ticket_ref }}"
+#       task_desc: 'PSU PATCHING'
+#   when: fresh_install
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for PSU Patch
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "PSU BUNDLE PATCHING"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "PSU BUNDLE PATCH for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  when: fresh_install
+  tags:
+  - apex_api
+
+- name: patch checklist post
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_patch_checklist_update.yml
+  vars:
+    chklst_json_body:
+      db_home: "{{ oracle_db_home }}"
+      host_name: "{{ ansible_hostname }}"
+      PSU_NUMBER: "{{ patch_num }}"
+      PSU_QUARTER: "{{ patch_quarter }}"
+      PSU_YEAR: "{{ patch_year }}"
+      patch_type: "{{ patch_type }}"
+      patch_status:  STARTED
+      new_entry: True
+  tags:
+  - apex_api
+
+- name: create tmp dir
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}"
+    state: directory
+    recurse: yes
+
+- name: get oracle_sid
+  shell: ps -ef | grep smon | grep {{ gi_sid }} | grep -v grep | awk '{ print $8 }'
+  register: ps_grep_smon
+  changed_when: False
+
+- name: set oracle_sid
+  set_fact:
+    oracle_sid: "{{ ps_grep_smon.stdout | regex_replace('asm_smon_(.*)', '\\1') }}"
+
+- import_tasks: check_opatch.yml
+
+- include_tasks: install_opatch.yml
+  when: opatch_version != opatch_version_required
+
+- include_tasks: copy_archives.yml
+
+- include_tasks: opatch_prereq.yml
+
+- include_tasks: opatch_apply.yml
+  when: inventory_hostname == curr_node
+  loop: "{{ ansible_play_hosts }}"
+  loop_control:
+    loop_var: curr_node
+
+- include_tasks: opatch_inventory.yml
+
+- block:
+  - name: get DBs in ORACLE_HOME
+    command: grep ":{{ oracle_home }}:" /etc/oratab
+    register: db_list
+    changed_when: False
+    ignore_errors: True
+
+  - include_tasks: datapatch.yml
+    vars:
+      oracle_db_name: "{{ db_detail | regex_replace('([^:]*).*','\\1') }}"
+    when:
+    - db_list | length > 0
+    - db_detail | regex_replace('([^:]*):.*','\\1') != 'no_sid'
+    loop: "{{ db_list.stdout_lines }}"
+    loop_control:
+      loop_var: db_detail
+  when: patch_type == 'RDBMS'
+
+- name: detemine success of opatch apply
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  shell: opatch lsinventory | grep {{ psu_version }}
+  register: opatch_lsinv_success
+  changed_when: False
+
+- debug:
+    var: opatch_lsinv_success.stdout_lines
+
+# - name: host checklist post for Patching
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       #ID: "{{ checklist_id }}"
+#       host_name: "{{ ansible_hostname }}"
+#       db_name: "{{ oracle_db_name }}"
+#       checklist_type: PATCHING
+#       checklist_category: Install
+#       new_entry: True
+#       db_install_status: SUCCESSFUL #Need a way to determine Failures
+#   when:
+#   - fresh_install
+#   - opatch_lsinv_success.stdout_lines |  length > 0
+#   tags:
+#   - apex_api
+
+
+- name: db checklist status post for PSU Patch
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "PSU BUNDLE PATCHING"
+    task_id: "{{ ticket_ref }}"
+    task_status: "SUCCESSFUL"
+    task_message: "PSU BUNDLE PATCH for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  when:
+    - fresh_install
+    - opatch_lsinv_success.stdout_lines |  length > 0
+  tags:
+  - apex_api
+
+# - name: host checklist post for Patching
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: True
+#       db_name: "{{ oracle_db_name }}"
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: PATCHING
+#       checklist_category: Install
+#       db_install_status: Failed #Need a way to determine Failures
+#   when:
+#   - fresh_install
+#   - opatch_lsinv_success.stdout_lines |  length == 0
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for PSU Patch
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "PSU BUNDLE PATCHING"
+    task_id: "{{ ticket_ref }}"
+    task_status: "FAILED"
+    task_message: "PSU BUNDLE PATCH for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  when:
+    - fresh_install
+    - opatch_lsinv_success.stdout_lines |  length == 0
+  tags:
+  - apex_api
+
+- name: Patch checklist post for Patching
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_patch_checklist_update.yml
+  vars:
+      chklst_json_body:
+        db_home: "{{ oracle_db_home }}"
+        host_name: "{{ ansible_hostname }}"
+        PSU_NUMBER: "{{ patch_num }}"
+        PSU_QUARTER: "{{ patch_quarter }}"
+        PSU_YEAR: "{{ patch_year }}"
+        patch_type: "{{ patch_type }}"
+        patch_status: PSU APPLIED SUCCESSFULLY
+        new_entry: True
+  when: opatch_lsinv_success.stdout_lines |  length > 0
+  tags:
+  - apex_api
+
+- name: Patch checklist post for Patching
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_patch_checklist_update.yml
+  vars:
+      chklst_json_body:
+        db_home: "{{ oracle_db_home }}"
+        host_name: "{{ ansible_hostname }}"
+        PSU_NUMBER: "{{ patch_num }}"
+        PSU_QUARTER: "{{ patch_quarter }}"
+        PSU_YEAR: "{{ patch_year }}"
+        patch_type: "{{ patch_type }}"
+        patch_status: PSU FAILED
+        new_entry: True
+  when: opatch_lsinv_success.stdout_lines |  length == 0
+  tags:
+  - apex_api

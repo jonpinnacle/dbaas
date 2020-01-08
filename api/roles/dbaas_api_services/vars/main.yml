@@ -1,0 +1,8 @@
+---
+
+
+#json_backup_dir: /apex/unsent_json_body
+
+cluster_nodes: "{{ ansible_play_hosts }}"
+
+master_node: "{{ ansible_play_hosts | first }}"

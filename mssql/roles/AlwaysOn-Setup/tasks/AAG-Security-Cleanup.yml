@@ -1,0 +1,9 @@
+- name: Copy AG-Security-Cleanup
+  win_template:
+    src: ../templates/AAG-Security-Cleanup.j2
+    dest: c:\Ansible\Temp\AAG-Security-Cleanup.sql
+
+- name: Run AG-Security-Cleanup
+  win_shell: 'sqlcmd  -i c:\Ansible\Temp\AAG-Security-Cleanup.sql > C:\Ansible\Logs\AAG-Security-Cleanup.log -U sa -P {{ SaPw }}'
+  register: checkAGlog
+  failed_when: '"Failed" in checkAGlog.stdout or checkAGlog.stderr != "" '

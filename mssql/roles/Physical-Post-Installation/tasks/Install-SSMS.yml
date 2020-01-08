@@ -1,0 +1,14 @@
+---
+- name: Install SSMS for 2016
+  win_package:
+    path: 'D:\Install\SQL2016\SSMS\SSMS-Setup-ENU.exe'
+    product_id: '{281BC3BA-FCB0-4056-B2B6-01D567D0D88C}'
+    arguments: /install /passive /norestart
+  when: SSMSVersion == 'v2016' and SqlVersion == 2016
+
+- name: Install SSMS for 2017
+  win_package:
+    path: 'D:\Install\SQL2016\SSMS\SSMS-Setup-ENU.exe'
+    product_id: '{4A144470-B2E3-4614-8AAC-370A0C80C919}'
+    arguments: /install /passive /norestart
+  when: SSMSVersion == 'v2017' and  SqlVersion == 2017

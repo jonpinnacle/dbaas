@@ -1,0 +1,16 @@
+---
+- name: Create a pfile-Source Server
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  block:
+  - name: Copy the create-pfile.sql file
+    copy: 
+      src: create-pfile.sql
+      dest: "{{ oracle_tmp }}/create-pfile.sql"
+
+  - name: Create spfile
+    command: "sqlplus / as sysdba @{{ oracle_tmp }}/create-pfile.sql"
+    register: opt2
+    failed_when: '"ERROR" in opt2.stdout'
+  when: inventory_hostname == master_node

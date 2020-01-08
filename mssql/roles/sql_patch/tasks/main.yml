@@ -1,0 +1,41 @@
+---
+- name: Check SQL Sever 2016 version
+  win_shell: Invoke-Sqlcmd -Query "SELECT SERVERPROPERTY('productversion') AS ProductVersion;" -QueryTimeout 3
+  register: Sql_version
+
+- name: Print the version of SQL Server
+  debug:
+    msg: Current SQL version "{{ Sql_version.stdout }}"
+
+- name: Create a directory for patch downloading
+  win_file:
+    path: c:\sql
+    state: directory
+
+- name: Check downloaded file exists or not
+  win_stat:
+    path: c:\sql\SQLServer2016-{{ KB_article_number }}-x64.exe
+  register: installer_file
+
+- name: Get the installer from Microsoft Download center
+  win_get_url:
+       url: '{{ Patch_download_URL }}'
+       dest: 'c:\sql\SQLServer2016-{{ KB_article_number }}-x64.exe'
+  when: not installer_file.stat.exists
+
+- name: Perform {{ action }} on the SQL server
+  win_command: SQLServer2016-{{ KB_article_number }}-x64.exe /SkipRules=Cluster_IsOnlineIfClustered /action={{ action }} /Q /allinstances /IAcceptSQLServerLicenseTerms
+  args:
+    chdir: c:\sql
+  ignore_errors: yes
+
+- name: Restart windows
+  win_reboot:
+
+- name: Check SQL Sever 2016  version
+  win_shell: Invoke-Sqlcmd -Query "SELECT SERVERPROPERTY('productversion') AS ProductVersion;" -QueryTimeout 3
+  register: Sql_version
+
+- name: Print the version of  SQL Server
+  debug:
+    msg: Current updated SQL version is "{{ Sql_version.stdout }}"

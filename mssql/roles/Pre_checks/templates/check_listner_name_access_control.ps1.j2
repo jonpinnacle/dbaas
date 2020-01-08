@@ -1,0 +1,17 @@
+import-module activedirectory
+
+set-location ad:
+$cluster = "{{ cluster_name }}"
+$listener = "{{ listner_name }}"
+
+$acl = (Get-ACL "AD:$((Get-ADComputer $listener).distinguishedname)").access
+
+$results = $null
+$results = $acl | where {$_.IdentityReference -Like "*$cluster*" -and $_.ActiveDirectoryRights -eq "GenericAll"}
+
+if ($results -eq $null)
+{write-host "Failure: Cluster does not have full control of listener"
+}
+else
+{write-host "Success: Cluster has full control of listener"
+}

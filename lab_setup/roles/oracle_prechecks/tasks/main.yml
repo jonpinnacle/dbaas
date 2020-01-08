@@ -1,0 +1,611 @@
+---
+### works
+- name: host checklist post update for post provisioning validation
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Oracle Prechecks"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "Prechecks for Provisioning on {{ ansible_hostname }}"
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- name: check required RPMs
+  yum:
+   list: installed
+  register: yum_updates
+
+- name: set installed rpms fact
+  set_fact:
+    installed_rpms: "{{ installed_rpms | default([]) }} + {{ yum_updates | json_query('results[?name == `' + item + '`].name') }}"
+  loop: "{{ required_rpms }}"
+
+- name: populate service facts
+  service_facts:
+
+- name: check SSH Service
+  set_fact:
+    ssh_service: "{% if ansible_facts['services']['sshd.service'] is defined -%}{{ ansible_facts['services']['sshd.service']['state'] }}
+                  {%- else -%}disabled
+                  {%- endif -%}"
+
+- name: check NTP Service
+  set_fact:
+    ntp_service: "{% if ansible_facts['services']['ntpd.service'] is defined -%}{{ ansible_facts['services']['ntpd.service']['state'] }}
+                  {%- else -%}disabled
+                  {%- endif -%}"
+
+- name: read NTP config
+  slurp:
+    src: /etc/sysconfig/ntpd
+  failed_when: False
+  register: read_ntpd_config
+
+- name: set ntpd content fact
+  set_fact:
+    ntpd_config_content: "{{ read_ntpd_config.content | default('') | b64decode }}"
+
+- name: set ntpd config facts
+  set_fact:
+    ntpd_config:
+      options: "{{ ntpd_config_content | regex_search('OPTIONS=.*') | regex_replace ('OPTIONS=','') | regex_replace ('\"','') }}"
+      sync: "{{ ntpd_config_content | regex_search('SYNC_HWCLOCK=.*') | regex_replace ('SYNC_HWCLOCK=','') | regex_replace ('\"','') }}"
+      date_options: "{{ ntpd_config_content | regex_search('NTPDATE_OPTIONS=.*') | regex_replace ('NTPDATE_OPTIONS=','') | regex_replace ('\"','') }}"
+
+- name: read kernel parameters
+  slurp:
+    src: /etc/sysctl.conf
+  failed_when: False
+  register: read_kernel_params
+
+- name: set kernel params content fact
+  set_fact:
+    kernel_params_content: "{{ read_kernel_params.content | default('') | b64decode }}"
+
+- name: set kernel param facts
+  set_fact:
+    kernel_params:
+      kernel_sem: "{{ kernel_params_content | regex_search('kernel.sem =.*') | regex_replace ('kernel.sem = ','') }}"
+      fs_aio_max_nr: "{{ kernel_params_content | regex_search('fs.aio-max-nr =.*') | regex_replace ('fs.aio-max-nr = ','') }}"
+      net_ipv4_ip_local_port_range: >
+        "{{ kernel_params_content | regex_search('net.ipv4.ip_local_port_range =.*') | regex_replace ('net.ipv4.ip_local_port_range = ','') }}"
+      net_core_rmem_default: "{{ kernel_params_content | regex_search('net.core.rmem_default =.*') | regex_replace ('net.core.rmem_default = ','') }}"
+      net_core_rmem_max: "{{ kernel_params_content | regex_search('net.core.rmem_max =.*') | regex_replace ('net.core.rmem_max = ','') }}"
+      net_core_wmem_default: "{{ kernel_params_content | regex_search('net.core.wmem_default =.*') | regex_replace ('net.core.wmem_default = ','') }}"
+      net_core_wmem_max: "{{ kernel_params_content | regex_search('net.core.wmem_max =.*') | regex_replace ('net.core.wmem_max = ','') }}"
+      fs_file_max: "{{ kernel_params_content | regex_search('fs.file-max =.*') | regex_replace ('fs.file-max = ','') }}"
+      kernel_shmmax: "{{ kernel_params_content | regex_search('kernel.shmmax =.*') | regex_replace ('kernel.shmmax = ','') }}"
+      kernel_shmall: "{{ kernel_params_content | regex_search('kernel.shmall =.*') | regex_replace ('kernel.shmall = ','') }}"
+      kernel_shmmni: "{{ kernel_params_content | regex_search('kernel.shmmni =.*') | regex_replace ('kernel.shmmni = ','') }}"
+
+##########################################################
+## If this is always mounted a specific way for Charter ##
+## we could check that mountpoint using Ansible Facts.  ##
+## Otherwise, this is the only option for this.         ##
+##########################################################
+- name: check TMP directory
+  shell: |
+    set -o pipefail
+    echo `df -kh /tmp | awk 'NR == 2 { print $4 }' | awk -F 'G' '{print $1}'`
+  args:
+    executable: /bin/bash
+  changed_when: False
+  register: tmp_size
+
+- name: check RW permission for all on /var/tmp
+  stat:
+    path: /var/tmp
+  register: tmp_perms
+
+- name: check ownership for /u01
+  stat:
+    path: /u01
+  register: ora_base
+
+- debug:
+    var: ora_base
+    verbosity: 1
+
+- name: umask value checker
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: umask
+  changed_when: False
+  register: umask_value
+
+##########################################################
+## For all ulimit settings, these could be set with     ##
+## `pam_limits` module.  However, like the perms check  ##
+## above, it wouldn't just check but instead would set  ##
+## the values as needed.                                ##
+##                                                      ##
+## I believe this one is also work making the change,   ##
+## but will leave it for now.  I have provided one      ##
+## example, commented out, below                        ##
+##                                                      ##
+## Also, if we use the `pam_limits` module, the entire  ##
+## ulimits section could be written as a loop           ##
+##########################################################
+
+# - name: ensure soft files ulimit is 2047
+#   pam_limits:
+#     domain: "{{ oracle_user }}"
+#     limit_type: "soft"
+#     limit_item: "nproc"
+#     value: "2047"
+- name: get ulimit value (soft files)
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: ulimit -Sn
+  changed_when: false
+  register: ulimit_soft_files
+
+- name: get ulimit value (hard files)
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: ulimit -Hn
+  changed_when: false
+  register: ulimit_hard_files
+
+- name: get ulimit value (hard procs)
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: ulimit -Hu
+  changed_when: false
+  register: ulimit_hard_procs
+
+- name: get ulimit value (soft stack)
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: ulimit -Ss
+  changed_when: false
+  register: ulimit_soft_stack
+
+- name: get ulimit value (hard stack)
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: ulimit -Hs
+  changed_when: false
+  register: ulimit_hard_stack
+
+- name: get ulimit value (soft memlock)
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: ulimit -Sl
+  changed_when: false
+  register: ulimit_soft_memlock
+
+- name: get ulimit value (hard memlock)
+  become: yes
+  become_user: "{{ oracle_user }}"
+  shell: ulimit -Hl
+  changed_when: false
+  register: ulimit_hard_memlock
+
+############################################################
+## Potentially could use `sysctl` module to set hugepages ##
+##                                                        ##
+## There are two caveats here:                            ##
+## 1. As with otheres, this doesn't just check, but will  ##
+##    also change the value if it's not set correctly     ##
+## 2. I'm not sure if the setting in the example below    ##
+##    is all that's needed.  So there may be more work    ##
+##    needed here even if Charter does want to use this   ##
+############################################################
+- name: ensure hugepages is set to half the size of memory
+  sysctl:
+    name: vm.nr_hugepages
+    value: "2560"
+    state: present
+- name: Get The Huge Page Total Size
+  shell: grep HugePages /proc/meminfo | awk ' $1 == "HugePages_Total:" {print $2}'
+  changed_when: False
+  register: huge_page_total_size
+
+- name: check oracle user
+  command: grep {{ oracle_user }} /etc/passwd
+  changed_when: False
+  failed_when: False
+  register: oracle_user_check
+- set_fact:
+    oracle_user_check: "{% if oracle_user_check.rc == 0 -%}Local User Exists
+                        {%- else -%}Local User Does Not Exist
+                        {%- endif %}"
+
+- name: check oracle groups
+  command: groups {{ oracle_user }}
+  changed_when: False
+  ignore_errors: True
+  register: oracle_group_check
+- set_fact:
+    oracle_group_check: "{{ oracle_group_check.stdout | regex_replace(oracle_user + ' : (.*)', '\\1') }}"
+
+#- name: Get The Ignored Users In pbis
+#  slurp:
+#    src: /etc/pbis/user-ignore
+#  register: pbis_ignored_users_in_srvr
+#  tags:
+#    - redhat
+#    - charteronly
+
+#- name: Check The Ignored Users List In pbis
+#  set_fact:
+#    missing_pbis_ignored_users: "{{ missing_pbis_ignored_users | default([]) }} + [ '{{ ignored_user }}' ]"
+#  when: ignored_user not in pbis_ignored_users_in_srvr.content | b64decode
+#  loop: "{{ pbis.ignored_users }}"
+#  loop_control:
+#    loop_var: ignored_user
+#  tags:
+#    - charteronly
+
+#- name: Get The Ignored Groups In pbis
+#  slurp:
+#    src: /etc/pbis/group-ignore
+#  register: pbis_ignored_groups_in_srvr
+#  tags:
+#    - charteronly
+
+#- name: Check The Ignored Groups List In pbis
+#  set_fact:
+#    missing_pbis_ignored_groups: "{{ missing_pbis_ignored_groups | default([]) }} + [ '{{ ignored_group }}' ]"
+#  when: ignored_group not in pbis_ignored_groups_in_srvr.content | b64decode
+#  loop: "{{ pbis.ignored_groups }}"
+#  loop_control:
+#    loop_var: ignored_group
+#  tags:
+#    - charteronly
+
+- name: Get The config of network
+  slurp:
+    src: /etc/sysconfig/network
+  register: network_config
+
+- name: check data disks
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ asm_data_pattern }}"
+    use_regex: no
+  register: asm_data_disks
+
+- name: check reco disks
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ asm_reco_pattern }}"
+    use_regex: no
+  register: asm_reco_disks
+
+- name: check exp disks
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ asm_exp_pattern }}"
+    use_regex: no
+  register: asm_exp_disks
+
+- name: check gg disks
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ asm_gg_pattern }}"
+    use_regex: no
+  register: asm_gg_disks
+  when: golden_gate_check
+
+- name: check ocr disks
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ asm_ocr_pattern }}"
+    use_regex: no
+  register: asm_ocr_disks
+  when: installation_type == "rac"
+
+- name: get shm size
+  command: df -m /dev/shm --output=size
+  changed_when: False
+  register: shm_size
+- set_fact:
+    shm_size: "{{ shm_size.stdout_lines[1] | trim | regex_replace('G', '') | int }}"
+
+- name: generate checklist output
+  set_fact:
+    checklist:
+    - check_name: Kernel Version
+      expected_value: 3 or higher
+      actual_value: "{{ ansible_kernel.split('.')[0] }}"
+      status: "{% if ansible_kernel.split('.')[0] | int < 3 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Swap Size
+      expected_value: "{% if ansible_memtotal_mb | int < 64000 -%}8192 or higher
+                       {%- elif ansible_memtotal_mb | int >= 64000 and
+                              ansible_memtotal_mb | int < 262144 -%}16300 or higher
+                       {%- elif ansible_memtotal_mb | int >= 262144 -%}32000 or higher
+                      {%- else -%}0
+                      {%- endif %}"
+      actual_value: "{{ ansible_swaptotal_mb }}"
+      status: "{% if (ansible_memtotal_mb | int < 64000 and
+                      ansible_swaptotal_mb < 8192) or
+                     (ansible_memtotal_mb | int >= 64000 and
+                      ansible_memtotal_mb | int < 262144 and
+                      ansible_swaptotal_mb < 16300) or
+                     (ansible_memtotal_mb | int >= 262144 and
+                      ansible_swaptotal_mb < 32000) -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Required RPMs
+      expected_value: "{{ required_rpms }}"
+      actual_value: "{{ installed_rpms }}"
+      status: "{% if required_rpms | difference(installed_rpms) | length > 0 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: SSH Service Status
+      expected_value: running
+      actual_value: "{{ ssh_service }}"
+      status: "{% if ssh_service != 'running' -%}FAILED
+               {%- else -%}PASSED
+               {%- endif -%}"
+    - check_name: NTPD Service Status
+      expected_value: running
+      actual_value: "{{ ntp_service }}"
+      status: "{% if ntp_service != 'running' -%}FAILED
+               {%- else -%}PASSED
+               {%- endif -%}"
+    - check_name: verifying ntpd config file
+      expected_value:
+           options: ' -u ntp:ntp -p /var/run/ntpd.pid -g -x'
+           hwclock_sync: "no"
+           date_options: ""
+      actual_value:
+           options: "{{ ntpd_config.options | default('') }}"
+           hwclock_sync: "{{ ntpd_config.sync | default('') }}"
+           date_options: "{{ ntpd_config.date_options | default('') }}"
+      status: "{% if ntpd_config.options | default('') != ' -u ntp:ntp -p /var/run/ntpd.pid -g -x' or
+                     ntpd_config.sync | default('') != 'no' or
+                     ntpd_config.date_options | default('') != '' -%}FAILED
+               {%- else -%}PASSED
+               {%- endif -%}"
+    - check_name: /var/tmp Size
+      expected_value: 4 or higher
+      actual_value: "{{ tmp_size.stdout }}"
+      status: "{% if tmp_size.stdout | int < 4 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: /tmp Size
+      expected_value: 1 or higher
+      actual_value: "{{ tmp_size.stdout }}"
+      status: "{% if tmp_size.stdout | int < 1 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: /var/tmp Permissions
+      expected_value: 1777
+      actual_value: "{{ tmp_perms.stat.mode }}"
+      status: "{% if tmp_perms.stat.mode != '1777' -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: /u01 Owner
+      expected_value: "{{ oracle_user }}"
+      actual_value: "{% if not ora_base.stat.exists -%}/u01 doesn't exist
+                     {%- else -%}{{ ora_base.stat.pw_name }}
+                     {%- endif %}"
+      status: "{% if not ora_base.stat.exists or
+                         ora_base.stat.pw_name != oracle_user -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: /u01/app Group
+      expected_value: "{{ oracle_groups[0] }}"
+      actual_value: "{{ ora_base.stat.gr_name }}"
+      status: "{% if ora_base.stat.gr_name != oracle_groups[0] -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: umask Value
+      expected_value: 22 (in any variant)
+      actual_value: "{{ umask_value.stdout }}"
+      status: "{% if umask_value.stdout | int != 22 -%}FAILED
+                {%- else -%}PASSED
+                {%- endif %}"
+    - check_name: Soft Files ulimit
+      expected_value: 2048 or higher
+      actual_value: "{{ ulimit_soft_files.stdout }}"
+      status: "{% if ulimit_soft_files.stdout | int < 2048 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Hard Files ulimit
+      expected_value: 65536 or higher
+      actual_value: "{{ ulimit_hard_files.stdout }}"
+      status: "{% if ulimit_hard_files.stdout | int < 65536 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Hard Processes ulimit
+      expected_value: 16384 or higher
+      actual_value: "{{ ulimit_hard_procs.stdout }}"
+      status: "{% if ulimit_hard_procs.stdout | int < 16384 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Soft Stack ulimit
+      expected_value: 10240 or higher
+      actual_value: "{{ ulimit_soft_stack.stdout }}"
+      status: "{% if ulimit_soft_stack.stdout | int < 10240 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Hard Stack ulimit
+      expected_value: 10240 or higher
+      actual_value: "{{ ulimit_hard_stack.stdout }}"
+      status: "{% if ulimit_hard_stack.stdout < 10240 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Soft memlock ulimit
+      expected_value: "{{ (ansible_memtotal_mb * 1024 * 0.9) | round(0,'floor') | int }}"
+      actual_value: "{{ ulimit_soft_memlock.stdout }}"
+      status: "{% if ulimit_soft_memlock.stdout | int < (ansible_memtotal_mb * 1024 * 0.9) | round(0,'floor') | int -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Hard memlock ulimit
+      expected_value: "{{ (ansible_memtotal_mb * 1024 * 0.9) | round(0,'floor') | int }}"
+      actual_value: "{{ ulimit_hard_memlock.stdout }}"
+      status: "{% if ulimit_hard_memlock.stdout  | int < (ansible_memtotal_mb * 1024 * 0.9) | round(0,'floor') | int -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: HugePages Total Size
+      expected_value: "{{ ansible_memtotal_mb // 2 }}"
+      actual_value: "{{ huge_page_total_size.stdout | int * 2 }}"
+      status: "{% if huge_page_total_size.stdout | int * 2 < ansible_memtotal_mb // 2 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Oracle user check
+      expected_value: Local User Exists
+      actual_value: "{{ oracle_user_check}}"
+      status: "{% if oracle_user_check != 'Local User Exists' -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: Oracle group check
+      expected_value: "{{ oracle_groups | join(' ') }}"
+      actual_value: "{{ oracle_group_check }}"
+      status: "{% if oracle_group_check.split(' ') | difference(oracle_groups) | length > 0 -%}FAILED
+              {%- else -%}PASSED
+              {%- endif %}"
+#    - check_name: Ignored PBIS users
+#      expected_value: "{{ pbis.ignored_users | join(',') }}"
+#      actual_value: "{{ pbis_ignored_users_in_srvr.content | b64decode | trim | regex_replace('\n',',') }}"
+#      status: "{% if missing_pbis_ignored_users is defined and
+#                     missing_pbis_ignored_users | length > 0 -%}FAILED
+#               {%- else -%}PASSED
+#               {%- endif %}"
+#    - check_name: Ignored PBIS groups
+#      expected_value: "{{ pbis.ignored_groups | join(',') }}"
+#      actual_value: "{{ pbis_ignored_groups_in_srvr.content | b64decode | trim | regex_replace('\n',',') }}"
+#      status: "{% if missing_pbis_ignored_groups is defined and
+#                     missing_pbis_ignored_groups | length > 0 -%}FAILED
+#               {%- else -%}PASSED
+#               {%- endif %}"
+    - check_name: Check /u01 Filesystem Size
+      expected_value: 59 GiB
+      actual_value: "{% if ansible_mounts | json_query('[?mount == `/u01`]') == [] -%}unmounted
+                     {%- else -%}{{ (ansible_mounts | json_query('[?mount == `/u01`].size_total|[0]') | int / 1024 | pow(3)) | round | int }} GiB
+                     {%- endif -%}"
+      status: "{% if ansible_mounts | json_query('[?mount == `/u01`]') == [] or
+                     (ansible_mounts | json_query('[?mount == `/u01`].size_total|[0]') | int / 1024 | pow(3)) | round | int < 59 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: check nozeroconf in config of network
+      expected_value: "NOZEROCONF=yes"
+      actual_value: "{{ network_config.content | b64decode | trim | regex_replace('\n',',') | regex_replace('#*','')}}"
+      status: "{% if 'NOZEROCONF=yes' not in network_config.content | b64decode -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: DATA Disks
+      expected_value: "1 or more DATA disks"
+      actual_value: "{{ asm_data_disks.matched }} DATA disks"
+      status: "{% if asm_data_disks.matched == 0 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: RECO Disks
+      expected_value: "1 or more RECO disks"
+      actual_value: "{{ asm_reco_disks.matched }} RECO disks"
+      status: "{% if asm_reco_disks.matched == 0 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: EXP Disks
+      expected_value: "3 EXP disks"
+      actual_value: "{{ asm_exp_disks.matched }} EXP disks"
+      status: "{% if asm_exp_disks.matched != 3 -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: GG Disks
+      expected_value: "{% if golden_gate_check -%}3 GG disks
+                       {%- else -%}
+                       {%- endif -%}"
+      actual_value: "{% if golden_gate_check -%}{{ asm_gg_disks.matched }}
+                     {%- else -%}
+                     {%- endif -%}"
+      status: "{% if golden_gate_check and
+                     asm_gg_disks.matched != 3 -%}FAILED
+               {%- elif not golden_gate_check -%}NOT_CHECKED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: OCR Disks
+      expected_value: "{% if installation_type == 'rac' -%}3 OCR disks
+                       {%- else -%}
+                       {%- endif -%}"
+      actual_value: "{% if installation_type == 'rac' -%}{{ asm_ocr_disks.matched }}
+                     {%- else -%}
+                     {%- endif -%}"
+      status: "{% if installation_type == 'rac' and
+                     asm_ocr_disks.matched != 3 -%}FAILED
+               {%- elif not installation_type == 'rac' -%}NOT_CHECKED
+               {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: /dev/shm Size
+      expected_value: "{{ (ansible_memtotal_mb * 0.8) | int }}"
+      actual_value: "{{ shm_size | int }}"
+      status: "{% if shm_size | int > (ansible_memtotal_mb * 0.8) | int -%}FAILED
+                {%- else -%}PASSED
+               {%- endif %}"
+    - check_name: check kernel parameters
+      expected_value: "{{ kernel_parameters }}"
+      actual_value: "{{ kernel_params }}"
+#      status: "{% if kernel_params.kernel_sem != kernel_parameters.kernel_sem or
+#                     kernel_params.fs_aio_max_nr != kernel_parameters.fs_aio_max_nr or
+#                     kernel_params.net_ipv4_ip_local_port_range != kernel_parameters.net_ipv4_ip_local_port_range or
+#                     kernel_params.net_core_rmem_default != kernel_parameters.net_core_rmem_default or
+#                    kernel_params.net_core_rmem_max != kernel_parameters.net_core_rmem_max or
+#                    kernel_params.net_core_wmem_default != kernel_parameters.net_core_wmem_default or
+#                     kernel_params.net_core_wmem_max != kernel_parameters.net_core_wmem_max or
+#                     kernel_params.fs_file_max != kernel_parameters.fs_file_max or
+#                    kernel_params.kernel_shmmax != kernel_parameters.kernel_shmmax or
+#                     kernel_params.kernel_shmall != kernel_parameters.kernel_shmall or
+#                     kernel_params.kernel_shmmni != kernel_parameters.kernel_shmmni -%}FAILED
+#                {%- else -%}PASSED
+#               {%- endif %}"
+      status: PASSED
+               
+- debug:
+    var: checklist | json_query('[?status == `FAILED`]')
+    verbosity: 1
+
+- name: create tmp dir
+  file:
+    path: "{{ oracle_tmp }}"
+    recurse: yes
+    state: directory
+
+- name: Write checklist to file for upload
+  copy:
+    dest: "{{ oracle_tmp }}/prereq_checklist.json"
+    content: "{{ checklist }}"
+
+- name: db checklist status file upload for prechecks Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status_file.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Oracle Prechecks"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload precheck json"
+    task_message: "Precheck json {{ ansible_hostname }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    logfile_path: "{{ oracle_tmp }}/prereq_checklist.json"
+    standard_task_id: "{{ standard_task_id_val }}"
+  tags:
+  - apex_api
+
+- name: view checklist
+  debug:
+    var: checklist
+    
+- name: Check for Precheck Failures
+  fail:
+    msg: "{% if checklist | json_query('[?status == `FAILED`]') | length == 1 -%}You have 1 failed check
+          {%- else -%}You have {{ checklist | json_query('[?status == `FAILED`]') | length }} failed checks
+          {%- endif %}"
+  when: checklist | json_query('[?status == `FAILED`]') | length > 0
+  tags:
+    - precheck_fail

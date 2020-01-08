@@ -1,0 +1,10 @@
+---
+- name: create aws vm's
+  hosts: "{{ host }}"
+  serial: 2
+  gather_facts: false
+  connection: local
+  roles:
+    - role: ocp_vms
+  tasks:
+    - meta: refresh_inventory

@@ -1,0 +1,32 @@
+---
+- name: create the pstage directory to the oracle user
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ pstage }}"
+    state: directory
+    recurse: yes
+
+- name: create the path to store the patch file
+  file:
+    path: "{{ psu_patch_path }}"
+    state: directory
+    recurse: yes
+
+- name: "get {{ patch_file }} from S3"
+  aws_s3:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    bucket: gfcloudsoftwarerepo
+    object: "ORACLE_DB/OPATCH/{{ patch_file }}"
+    dest: "{{ psu_patch_path }}/{{ patch_file }}"
+    mode: get
+
+- name: unzip patch
+  become_user: "{{ oracle_user }}"
+  unarchive: 
+    src: "{{ psu_patch_path }}/{{ patch_file }}" 
+    dest: "{{ pstage }}" 
+    remote_src: yes 
+    keep_newer: true
+    validate_certs: no

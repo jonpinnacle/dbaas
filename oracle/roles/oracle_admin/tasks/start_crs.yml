@@ -1,0 +1,9 @@
+---
+- name: start CRS
+  environment: "{{ ora_user_env }}"
+  command: crsctl start {{ crs_type }}
+  when: inventory_hostname == master_node
+
+- name: Wait for CRS to start
+  pause:
+    seconds: 90

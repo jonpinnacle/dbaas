@@ -1,0 +1,95 @@
+#!/bin/bash
+
+init() {
+
+export PATH=/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/oracle/.local/bin
+export ORAENV_ASK=NO
+. oraenv
+v_host=`hostname`
+
+parse_to_json="python /home/oracle/playbook/csv2json.py"
+run_dir="/home/oracle/playbook"
+
+ V_CREATE_DIR="create or replace directory OPATCH_INST_DIR as '${v_software_dir}/OPatch'"
+ f_sys_cmd "${V_CREATE_DIR};"
+ V_CREATE_DIR="create or replace directory OPATCH_LOG_DIR as '${v_software_dir}/QOpatch'"
+ f_sys_cmd "${V_CREATE_DIR};"
+ V_CREATE_DIR="create or replace directory OPATCH_SCRIPT_DIR as '${v_software_dir}/QOpatch'"
+ f_sys_cmd "${V_CREATE_DIR};"
+
+
+}
+
+f_sys_cmd() {
+
+sys_cmd_sql="$1"
+
+$ORACLE_HOME/bin/sqlplus -s '/ as sysdba' 1>/dev/null 2>&1<<EOF
+${sys_cmd_sql}
+EOF
+ 
+}
+
+rest_status() {
+
+task_id="$1"
+task_area="$2"
+record_type="$3"
+task_status="$4"
+task_message="$5"
+restdata="$6"
+
+curl -k -X POST \
+  https://apex-dev.techlab.com:8443/ords/invent2/charter/send_process_status \
+  -H 'cache-control: no-cache' \
+  -H 'content-type: application/json' \
+  -H "record_type: $record_type" \
+  -H "task_area: $task_area" \
+  -H "task_id: $task_id " \
+  -H "task_key: ${v_host}-${ORACLE_SID}" \
+  -H "task_status: $task_status " \
+  -H "task_message: $task_message " \
+  -d " $restdata " >/dev/null 2>&1
+
+}
+
+get_db_data() {
+
+v_get_process="$1"
+v_input_file="$2"
+v_output_file="$3"
+v_format="$4"
+#
+$ORACLE_HOME/bin/sqlplus -s '/ as sysdba' 1>/dev/null 2>&1<<EOF
+@${v_get_process}
+EOF
+
+if [[ "$v_format" = "json" ]] ;then
+ v_output_file=$(${parse_to_json} $v_input_file)
+ cat $v_output_file
+else
+ cat ${v_input_file}
+fi
+
+}
+
+init
+cd $run_dir
+
+rest_result=$(rest_status "$$" "Gather License Info" "MESSAGE" "IN-PROGRESS" "Started Task" "")
+#
+#Collect Feature data
+#
+rest_result=$(rest_status "$$" "Gather License Info" "MESSAGE" "SUCCESS" "Gathering Feature Info" "")
+restdata=$(get_db_data "feature_stats.sql" "features.csv" "features.json" "json")
+rest_result=$(rest_status "$$" "Gather License Info" "LOAD_JSON" "SUCCESS" "Uploaded Feature Data" "$restdata")
+
+#
+#Collect Product data
+#
+rest_result=$(rest_status "$$" "Gather License Info" "MESSAGE" "SUCCESS" "Gathering Product Info" "")
+restdata=$(get_db_data "product_stats.sql" "products.csv" "products.json" "json")
+rest_result=$(rest_status "$$" "Gather License Info" "LOAD_JSON" "SUCCESS" "Uploaded Product Data" "$restdata")
+sleep 1
+rest_result=$(rest_status "$$" "Gather License Info" "MESSAGE" "COMPLETED" "Ended Task" "")
+

@@ -1,0 +1,6 @@
+---
+- name: prepare lab server for install
+  hosts: '{{ host }}'
+  tasks:
+  - import_role:
+      name: mssql_AD_join

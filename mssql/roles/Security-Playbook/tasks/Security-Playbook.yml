@@ -1,0 +1,58 @@
+---
+- name: Create temp directory
+  win_file:
+    path: C:\Ansible\Temp
+    state: directory
+
+- name: copy the Delete-Administrators file
+  win_template:
+      src: ../templates/Delete-Administrators.j2
+      dest: c:\Ansible\Temp\Delete-Administrators.ps1
+  diff: false
+
+- name: Add SQL Windows Accts SQL2
+  win_shell: |
+     C:\Ansible\Temp\Delete-Administrators.ps1 > C:\Ansible\Logs\Delete-Administrators.log
+  register: Add_SQL
+  no_log: true
+  any_errors_fatal: true
+  failed_when: '"Failed" in Add_SQL.stdout or Add_SQL.stderr != "" '
+
+- name: Protected Output - Add SQL Windows Accts SQL2
+  debug:
+    var: "Add_SQL | combine({'cmd': Add_SQL.cmd | replace(SaPwNew, '<PASSWORD HIDDEN>') | replace(password, '<PASSWORD HIDDEN>')})"
+  failed_when: Add_SQL.rc
+
+- name: Insert Row in Password Table
+  win_shell: |
+    $Date = Get-Date -Format g
+    $Date
+    $Qry = "IF NOT EXISTS (SELECT TOP 1 1 FROM [{{ charter_dba }}].[PWD].[Passwords] WHERE ServerName = '{{ ansible_hostname }}' AND Username = 'sa')
+             INSERT INTO [{{ charter_dba }}].[PWD].[Passwords] ([GroupName],[ServerName],[UserName],[Password],[Type])
+             VALUES('{{ GName }}','{{ ansible_hostname }}','sa', [{{ charter_dba }}].[dbo].[FNC_ENCRIPTION_PW]('{{ SaPwNew }}') ,'SQL')
+             IF EXISTS (SELECT TOP 1 1 FROM [{{ charter_dba }}].[PWD].[Passwords] WHERE ServerName = '{{ ansible_hostname }}' AND UserName = 'sa')
+             UPDATE [{{ charter_dba }}].[PWD].[Passwords]
+             SET [Password] = [{{ charter_dba }}].[dbo].[FNC_ENCRIPTION_PW]('{{ SaPwNew }}')
+             WHERE  ServerName = '{{ ansible_hostname }}' AND UserName = 'sa'"
+
+    Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username "{{ username }}" -password "{{ password }}"
+  register: pass_row_insert
+  any_errors_fatal: true
+  failed_when: '"Failed" in pass_row_insert.stdout or pass_row_insert.stderr != "" '
+  no_log: False
+
+- name: Protected Output - Insert Row in Password Table
+  debug:
+    var: "pass_row_insert | combine({'cmd': pass_row_insert.cmd | replace(SaPwNew, '<PASSWORD HIDDEN>') | replace(password, '<PASSWORD HIDDEN>')})"
+  failed_when: pass_row_insert.rc
+
+- name: remove ProtectionPolicy from registry
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Cryptography\Protect\Providers\df9d8cd0-1501-11d1-8c7a-00c04fc297eb
+    name: ProtectionPolicy
+    state: absent
+
+- name: Delete Temp Directory
+  win_file:
+    path: C:\Ansible\Temp
+    state: absent

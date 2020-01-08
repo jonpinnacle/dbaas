@@ -1,0 +1,49 @@
+---
+
+- include_vars: secrets.yml
+  no_log: True
+
+- name: get asm disk paths - {{ diskgroup.dir }}
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ diskgroup.pattern }}"
+    use_regex: no
+  register: diskgroup_list
+
+- block: 
+  - name: create {{ diskgroup_name }} DG
+    become_user: "{{ oracle_user }}"
+    environment: "{{ ora_user_env }}"
+    no_log: true
+    command: asmca \
+              -silent \
+              -createDiskGroup \
+              -diskGroupName {{ diskgroup_name }} \
+              -diskList '{{ diskgroup_list  | json_query("files[].path") | join("','") }}' \
+              -redundancy external \
+              -au_size 4 \
+              -compatible.asm {{ oracle_compat_version }} \
+              -compatible.advm {{ oracle_compat_version }} \
+              -sysAsmPassword {{ oracle_asm_syspass }} \
+    register: diskgroup_name_create
+
+  always: 
+  - name: Protected Debug Output - create {{ diskgroup_name }} DG
+    debug:                                                                  
+      var: "lookup('vars', 'diskgroup_name_create') | combine({'cmd': lookup('vars', 'diskgroup_name_create').cmd | replace(oracle_asm_syspass, '<PASSWORD HIDDEN>')})"
+    when: lookup('vars', 'diskgroup_name_create').failed
+    
+  - name: save create_{{ diskgroup_name }}.out
+    copy:
+      dest: "{{ oracle_tmp }}/create_{{ diskgroup_name }}.out"
+      content: "{{ lookup('vars', 'diskgroup_name_create').stdout | default('') }}"
+    when: lookup('vars', 'diskgroup_name_create').changed
+
+  - name: save create_{{ diskgroup_name }}.err
+    copy:
+      dest: "{{ oracle_tmp }}/create_{{ diskgroup_name }}.err"
+      content: "{{ lookup('vars', 'diskgroup_name_create').stderr | default('') }}"
+    when: 
+    - lookup('vars', 'diskgroup_name_create').changed
+    - lookup('vars', 'diskgroup_name_create').stderr_lines | length > 0

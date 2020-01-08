@@ -1,0 +1,36 @@
+---
+
+install_base: /u01/app
+
+oracle_base: "{{ install_base }}/oracle"
+
+asm_disk_location: /dev/oracleasm/disks
+
+gg_vol_size: 25
+
+exp_vol_size: 295
+
+gg_dg:
+  name: GG_DG
+  dir: gg
+  pattern: GG*
+  vol: GG_FS_VOL
+  size: "{{ gg_vol_size }}"
+
+exp_dg:
+  name: EXP_DG
+  dir: exp
+  pattern: EXP*
+  vol: EXP_FS_VOL
+  size: "{{ exp_vol_size }}"
+
+create_exp_diskgroup: True
+
+create_gg_diskgroup: False
+
+oracle_version: 12.1.0.2
+
+oracle_asm_name: +ASM
+oracle_sid: +ASM
+
+standard_task_id: "0"

@@ -1,0 +1,8 @@
+---
+- name: Cluster Verify
+  hosts: '{{ host }}' # Comma-deliminated list (e.g. server1.domain,server2.domain,server3.domain)
+  any_errors_fatal: true
+  become: yes
+  tasks:
+  - import_role:
+      name: oracle_cluster_verify

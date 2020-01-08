@@ -1,0 +1,48 @@
+:setvar PrimaryReplica {{ PrimaryReplica }} 
+:setvar SecondaryReplica {{ SecondaryReplica }} 
+:setvar DrReplica {{ DrReplica }} 
+:setvar EndPointPort {{ EndPointPort }}
+:setvar AvailabilityGroup {{ AvailabilityGroup }}
+:setvar Listener {{ Listener }} 
+:setvar IPListener {{ IPListener }}
+:setvar IPListener2 {{ IPListener2 }}
+:setvar ListenerPort {{ ListenerPort }}
+:setvar ListenerSubnet {{ ListenerSubnet }} 
+:setvar ListenerSubnet2 {{ ListenerSubnet2 }}
+
+:Connect $(SecondaryReplica)
+ 
+USE [master]
+GO
+ 
+declare @AVGLogin as sysname
+declare @CMD nvarchar(max)
+ 
+select @AVGLogin=service_account from sys.dm_server_services
+where servicename like 'SQL Server (%'
+ 
+if not exists(select name from syslogins where name=@AVGLogin)
+begin
+ set @CMD=N'CREATE LOGIN [' + @AVGLogin + '] FROM WINDOWS WITH DEFAULT_DATABASE=[master], DEFAULT_LANGUAGE=[us_english]'
+ print 'Create service account as server login...'
+ exec sp_executesql @CMD
+end
+ 
+if not exists (select name from sys.endpoints where name='Hadr_endpoint')
+begin
+print 'Create HA/DR endpoint...'
+CREATE ENDPOINT [Hadr_endpoint] 
+ AS TCP (LISTENER_PORT = $(EndPointPort))
+ FOR DATA_MIRRORING (ROLE = ALL, ENCRYPTION = REQUIRED ALGORITHM AES)
+end
+ 
+IF (SELECT state FROM sys.endpoints WHERE name = N'Hadr_endpoint') <> 0
+BEGIN
+ ALTER ENDPOINT [Hadr_endpoint] STATE = STARTED
+END
+ 
+set @CMD=N'GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [' + @AVGLogin + ']'
+print 'GRANT CONNECT ON ENDPOINT...'
+exec sp_executesql @CMD
+ 
+GO

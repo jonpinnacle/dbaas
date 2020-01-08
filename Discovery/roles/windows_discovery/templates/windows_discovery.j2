@@ -1,0 +1,77 @@
+#jinja2: trim_blocks:False, lstrip_blocks:True
+{%- set glob_active_int = {'count':0} -%}
+{%- set glob_drives = {'count':0} -%}
+{%- set glob_partitions = {'count':0} -%}
+{%- set glob_ipv4 = [] -%}
+{%- set glob_ipv6 = [] -%}
+{%- set glob_tmp = {'exists':False} -%}
+{%- set glob_mnt = {'size':0} -%}
+{ "hostname":"{{ ansible_hostname }}",
+  "OS_version":"{{ ansible_distribution }}",
+  "domain":"{{ ansible_windows_domain }}",
+  "number_of_drives":{{ ansible_facts.disks|length }},
+  {%- set _ = glob_drives.update({'count':ansible_facts.disks|length}) %}
+  "Drive_size_mapping": [
+  {%- for disk in ansible_facts.disks %}
+  {%- set _ = glob_partitions.update({'count':0}) %}
+      {
+      "disk_size":"{{ disk.size }}",
+      "partitions": [
+    {%- for partition in disk.partitions -%}
+      {%- if partition.drive_letter is defined and partition.drive_letter != None %}
+        {%- set _ = glob_partitions.update({'count':glob_partitions['count'] +1}) -%}
+      {%- endif -%}
+    {%- endfor %}
+    {%- for partition in disk.partitions -%}
+      {%- if partition.drive_letter is defined and partition.drive_letter != None %} 
+          {
+          "part_mapp":"{{ partition.drive_letter }}",
+          "part_size":"{{ partition.size }}"
+        {%- if glob_partitions['count'] > 1 %}
+          },
+          {%- set _ = glob_partitions.update({'count':glob_partitions['count'] -1}) -%}
+        {% else %}
+          }
+        {%- endif %}
+      {%- endif %}
+    {%- endfor %}
+      ]
+    {%- if glob_drives['count'] > 1 %}
+      },
+      {%- set _ = glob_drives.update({'count':glob_drives['count'] -1}) -%}
+    {% else %}
+      }
+    {%- endif %}
+  {%- endfor %}
+  ],
+  {%- set _ = glob_active_int.update({'count':ansible_facts.interfaces|length}) %}
+  "active_nics_number":{{ansible_interfaces|length}},
+  "active_nics": [
+  {%- for interface in ansible_interfaces -%}
+  {%- set glob_ipv4 = [] -%}
+  {%- set glob_ipv6 = [] -%}
+    {%- for ip_addess in interface.ip_addresses %}
+      {%- if ip_addess | ipv4 %}
+        {%- set _ = glob_ipv4.append(ip_addess) -%}
+      {%- endif %}
+      {%- if ip_addess | ipv6 %}
+        {%- set _ = glob_ipv6.append(ip_addess) -%}
+      {%- endif %}
+  {%- endfor %}
+      {
+       "label":"{{ interface.connection_name }}",
+       "ipv4":"{{ glob_ipv4|join(' ') }}",
+       "ipv6":"{{ glob_ipv6|join(' ') }}"
+    {%- if glob_active_int['count'] > 1 %}
+      },
+      {%- set _ = glob_active_int.update({'count':glob_active_int['count'] -1}) -%}
+    {% else %}
+      }    
+    {%- endif -%}
+  {%- endfor %}
+  ],
+  "cores":{{ ansible_processor_cores }},
+  "sockets":{{ ansible_processor_count }},
+  "memory":{{ ansible_memtotal_mb }},
+  "swap":{{ ansible_swaptotal_mb }}
+}

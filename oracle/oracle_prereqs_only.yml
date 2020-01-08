@@ -1,0 +1,8 @@
+---
+
+- name: Oracle Pre-Reqs
+  hosts: '{{ host }}'
+  become: yes
+  tasks:
+  - import_role:
+      name: oracle_prereqs

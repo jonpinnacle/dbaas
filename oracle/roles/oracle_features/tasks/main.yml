@@ -1,0 +1,107 @@
+---
+- name: db checklist status post for Features
+  import_role:
+    name: oracle_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "FEATURES"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "FEATURES for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- name: create directory for features
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    mode: 0755
+    path: "{{ oracle_features_tmp }}/features"
+    state: directory
+
+- name: Put necessary processing file on server
+  copy:
+    src: "{{ feature_files }}"
+    dest: "{{ oracle_features_tmp }}/features"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0755
+  loop: "{{ feature_files }}"
+  loop_control:
+    loop_var: feature_files
+  changed_when: false
+
+- name: Put csv2json file on server
+  copy:
+    src: "csv2json.py"
+    dest: "{{ oracle_features_tmp }}/features"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0755
+
+- include_tasks: get_db_name.yml
+
+
+- name: Include Get Products and Features
+  include_tasks: get_products_features.yml
+  with_dict: "{{db_info}}"
+
+- debug:
+    msg: "{{ db_info }}"
+
+- include_tasks: post_products_features.yml
+
+# - name: check oracle_db_name is defined or not
+#   debug:
+#     msg: The Variable oracle_db_name is not defined
+#   when: oracle_db_name is undefined
+#
+# - name: set oracle_home
+#   block:
+#     - name: get oracle_sid
+#       shell: ps -ef | grep smon | grep -v grep | awk '{ print $8 }'
+#       register: ps_grep_smon
+#       changed_when: False
+#
+#     - name: set oracle_sid
+#       set_fact:
+#         oracle_sid: "{{ ps_grep_smon.stdout | regex_replace('ora_smon_(.*)', '\\1') }}"
+# #      when: oracle_db_name > length=0
+#
+#     - name: get db details
+#       shell: grep "^{{ oracle_sid }}:" /etc/oratab | awk 'NR == 1'
+#       ignore_errors: yes
+#       changed_when: false
+#       register: db_details
+#
+#     - name: set oracle_home
+#       set_fact:
+#         oracle_home: "{{ db_details.stdout | regex_replace('^[^:]*:([^:]*).*', '\\1') }}"
+#
+#     - fail:
+#         msg: Database named {{ oracle_sid }} doesn't exists'
+#       when: oracle_home == ""
+#   when: oracle_context != 'grid'
+#   ignore_errors: yes
+
+
+- name: remove directory for features
+  file:
+    path: "{{ oracle_features_tmp }}/features"
+    state: absent
+
+- name: db checklist status post for Features
+  import_role:
+    name: oracle_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "FEATURES"
+    task_id: "{{ ticket_ref }}"
+    task_status: "SUCCESS"
+    task_message: "FEATURES for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+    tags:
+    - apex_api

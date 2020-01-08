@@ -1,0 +1,24 @@
+---
+expected_ram: 8
+Domain: TECHLAB
+expected_cpu_processor_core: 1
+
+
+BuPath: C:\ #backup drive
+DataPath: C:\ # data driver
+LogPath: C:\ #logs drive
+SystemPath: C:\ #system drive
+TempdbPath: C:\ # temp drive
+
+
+## drive_sizes
+
+expected_c_drive_size: 80
+expected_d_drive_size: 45
+expected_e_drive_size: 80
+expected_f_drive_size: 80
+expected_g_drive_size: 80
+expected_h_drive_size: 80
+expected_i_drive_size: 80
+expected_j_drive_size: 80
+expected_k_drive_size: 80

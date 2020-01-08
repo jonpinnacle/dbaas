@@ -1,0 +1,183 @@
+---
+- name: Insert Row in ServerList table
+  win_shell: |
+
+    $Date = Get-Date -Format g
+    $Date
+
+    #Updated to get numeric environment ID
+
+    $cn = New-Object System.Data.SqlClient.SqlConnection
+
+    $cn.ConnectionString = "Data Source={{ SQLInst }}; User ID={{ username }}; Password={{ password }}; Initial Catalog={{charter_dba}}"
+
+    $cn.Open()
+    # Fetch Server list into the Data source from Srv.ServerList Table from CentralDB
+    $ds = new-object "System.Data.DataSet" "dspw"
+
+    $q = "SELECT [DCID] AS 'Value' FROM [MGT].[DataCenters] WHERE [DCName] = '{{ DC }}';"
+
+    $da = new-object "System.Data.SqlClient.SqlDataAdapter" ($q, $cn)
+    $da.Fill($ds)
+    $cn.Close()
+
+    $dtDCList = $ds.Tables[0]
+    $DCList = $dtDCList | Select Value
+    $DCNum = $DCList.Value
+    $DCNum
+
+    #Updated 10-31-2018 for modified ServerList table
+    $Qry = "IF NOT EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[SVR].[SERVERLIST] WHERE SERVERNAME = '{{ ansible_hostname }}')
+    INSERT INTO [{{charter_dba}}].[SVR].[ServerList] ([ServerName],[Environment],[DateAdded],[Active],[DC],[SecurityZone],[REDorBLUE])
+            VALUES('{{ ansible_hostname }}','{{ Env1 }}', '$Date' ,'Y','$DCNum','{{SecurityZone}}','{{RedorBlue}}')
+
+    IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[SVR].[SERVERLIST] WHERE SERVERNAME = '{{ ansible_hostname }}' AND ACTIVE = 'N')
+    UPDATE [{{charter_dba}}].[SVR].[ServerList]
+    SET [Environment] = '{{ Env1 }}'
+       ,[DateAdded] = '$Date'
+       ,[Active]='Y'
+       ,[DC] = '$DCNum'
+       ,[SecurityZone] = '{{SecurityZone}}'
+       ,[REDorBLUE] = '{{RedorBlue}}'
+    WHERE  SERVERNAME = '{{ ansible_hostname }}' AND ACTIVE = 'N'"
+
+    Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username “{{ username }}” -password “{{ password }}”
+
+    #New 10-31-18 for ClusterList update
+    If ("{{ IsVMBinary }}" -eq "Y")
+    {
+    	$Qry = "IF NOT EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[CLU].[ClusterList] WHERE ClusterName = '{{ nameWSFC }}')
+    			INSERT INTO [{{charter_dba}}].[CLU].[ClusterList] ([ClusterName],[Environment],[DateAdded],[ClusterVersion],[NumberOfNodes],[ClusterType],[Active])
+            	VALUES('{{ nameWSFC }}','{{ Env1 }}','$Date','{{ OSName }}','{{ ansible_play_hosts | length }}','{{ CluType }}','Y')
+
+    			IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[CLU].[ClusterList] WHERE ClusterName = '{{ nameWSFC }}' AND ACTIVE = 'N')
+    			UPDATE [{{charter_dba}}].[CLU].[ClusterList]
+    			SET [Environment] = '{{ Env1 }}', [DateAdded] = '$Date', [Active]='Y', [NumberOfNodes] = '{{ ansible_play_hosts | length }}', [ClusterType] = '{{ CluType }}'
+    			WHERE  ClusterName = '{{ nameWSFC }}'  AND ACTIVE = 'N'"
+
+    	Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username “{{ username }}” -password “{{ password }}”
+
+    	$Qry = "IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[SVR].[ServerList] WHERE [ServerName] = '{{ ansible_hostname }}')
+    			UPDATE  [{{charter_dba}}].[SVR].[ServerList]
+    			SET [WindowsClusterID] = (SELECT DISTINCT [WindowsClusterID] FROM [{{charter_dba}}].[CLU].[ClusterList] WHERE ClusterName = '{{ nameWSFC }}')
+    			WHERE [ServerName] = '{{ ansible_hostname }}'"
+
+    	Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username “{{ username }}” -password “{{ password }}”
+
+    }
+
+    #New 10-31-18 for InstanceList update
+
+    If ('{{ Env1 }}' -eq 'PRD' -or '{{ Env1 }}' -eq 'DR') { $SQLEd = "Enterprise" }
+    Else { $SQLEd = "Developer" }
+
+    If ({{ SqlVersionStr }} -eq "2012") { $Ver = 'SQL Server 2012' }
+    If ({{ SqlVersionStr }} -eq "2014") { $Ver = 'SQL Server 2014' }
+    If ({{ SqlVersionStr }} -eq "2016") { $Ver = 'SQL Server 2016' }
+    If ({{ SqlVersionStr }} -eq "2017") { $Ver = 'SQL Server 2017' }
+
+    $Qry = "IF NOT EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[INST].[InstanceList] WHERE [InstanceName] = '{{ ansible_hostname }}')
+    			INSERT INTO [{{charter_dba}}].[INST].[InstanceList] ([InstanceName],[Environment],[SQLEdition],[SQLVersion],[Clustered],[WinClusterName],[ClusterType],[NumberOfNodes],[Virtual],[Active],[DateAdded],[Audited],[SecurityZone],[BusinessUnitLeaderIdentity])
+            	VALUES('{{ ansible_hostname }}','{{ Env1 }}','$SQLEd','$Ver','{{ IsClu }}','{{ nameWSFC }}','{{ CluType }}','{{ ansible_play_hosts | length }}','{{ IsVMBinary }}','Y','$Date','{{ Audit }}','{{SecurityZone}}', '{{ BUL }}')
+
+    			IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[INST].[InstanceList] WHERE [InstanceName] = '{{ ansible_hostname }}' AND ACTIVE = 'N')
+    			UPDATE [{{charter_dba}}].[INST].[InstanceList]
+    			SET [Environment] = '{{ Env1 }}'
+    			,[SQLEdition] = '$SQLEd'
+    			,[SQLVersion] = '$Ver'
+    			,[Clustered] = '{{ IsClu }}'
+    			,[WinClusterName] = '{{ nameWSFC }}'
+    			,[ClusterType] = '{{ CluType }}'
+    			,[NumberOfNodes] = '{{ ansible_play_hosts | length }}'
+    			,[Virtual] = '{{ IsVMBinary }}'
+                ,[DateAdded] = '$Date'
+    			,[Active]='Y'
+                ,[Audited]='{{ Audit }}'
+                ,[SecurityZone]='{{SecurityZone}}'
+                ,[BusinessUnitLeaderIdentity]='{{ BUL }}'
+    			WHERE [InstanceName] = '{{ ansible_hostname }}'  AND ACTIVE = 'N'"
+
+    Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username {{ username }} -password {{ password }}
+
+    If ("{{ IsVMBinary }}" -eq "Y")
+    {
+    	$Qry = "IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[INST].[InstanceList] WHERE [InstanceName] = '{{ ansible_hostname }}')
+    			UPDATE  [{{charter_dba}}].[INST].[InstanceList]
+    			SET [VmClusterID] = (SELECT DISTINCT [VmClusterID] FROM [{{charter_dba}}].[VM].[VmClusterInfo] WHERE ClusterName = '{{ VCName }}')
+    			WHERE [InstanceName] = '{{ ansible_hostname }}'"
+
+    	Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username “{{ username }}” -password “{{ password }}”
+
+    	$Qry = "IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[SVR].[ServerList] WHERE [ServerName] = '{{ ansible_hostname }}')
+    			UPDATE  [{{charter_dba}}].[SVR].[ServerList]
+    			SET [VmClusterID] = (SELECT DISTINCT [VmClusterID] FROM [{{charter_dba}}].[VM].[VmClusterInfo] WHERE ClusterName = '{{ VCName }}')
+    			WHERE [ServerName] = '{{ ansible_hostname }}'"
+
+    	Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username {{ username }} -password {{ password }}
+    }
+
+    #New 10-31-18 xref Project/Server & Server/Application & Instance/Application & Server/Instance
+
+    $Qry = "DECLARE @SID INT
+    		DECLARE @IID INT
+
+    		SELECT @SID = [ServerID] FROM [{{charter_dba}}].[SVR].[ServerList] WHERE ServerName = '{{ ansible_hostname }}' AND [Active] = 'Y'
+    		SELECT @IID = [InstanceID] FROM [{{charter_dba}}].[INST].[InstanceList] WHERE InstanceName = '{{ ansible_hostname }}' AND [Active] = 'Y'
+
+    		--Prj/Server
+    		IF NOT EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[MGT].[ProjectServerXREF] WHERE [PrjIdentity] = '{{ PrjId }}' AND [ServerID] = @SID)
+    		INSERT INTO [{{charter_dba}}].[MGT].[ProjectServerXREF] ([PrjIdentity],[ServerID],[DateAdded])
+            VALUES('{{ PrjId }}',@SID,'$Date')
+
+    		IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[MGT].[ProjectServerXREF] WHERE [PrjIdentity] = '{{ PrjId }}' AND [ServerID] = @SID)
+    		UPDATE [{{charter_dba}}].[MGT].[ProjectServerXREF]
+    		SET [PrjIdentity] = '{{ PrjId }}'
+    		,[ServerID] = @SID
+    		,[DateAdded] = '$Date'
+    		WHERE [PrjIdentity] = '{{ PrjId }}' AND [ServerID] = @SID
+
+    		--App/Server
+    		IF NOT EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[MGT].[ApplicationServerXREF] WHERE [AppId] = '{{ AppId }}' AND [ServerID] = @SID)
+    		INSERT INTO [{{charter_dba}}].[MGT].[ApplicationServerXREF] ([AppId],[ServerID],[DateAdded])
+            VALUES('{{ AppId }}',@SID,'$Date')
+
+    		IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[MGT].[ApplicationServerXREF] WHERE [AppId] = '{{ AppId }}' AND [ServerID] = @SID)
+    		UPDATE [{{charter_dba}}].[MGT].[ApplicationServerXREF]
+    		SET [AppId] = '{{ AppId }}'
+    		,[ServerID] = @SID
+    		,[DateAdded] = '$Date'
+    		WHERE [AppId] = '{{ AppId }}' AND [ServerID] = @SID
+
+    		--App/Instance
+    		IF NOT EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[MGT].[ApplicationInstanceXREF] WHERE [AppId] = '{{ AppId }}' AND [InstanceID] = @IID)
+    		INSERT INTO [{{charter_dba}}].[MGT].[ApplicationInstanceXREF] ([AppId],[InstanceID],[DateAdded])
+            VALUES('{{ AppId }}',@IID,'$Date')
+
+    		IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[MGT].[ApplicationInstanceXREF] WHERE [AppId] = '{{ AppId }}' AND [InstanceID] = @SID)
+    		UPDATE [{{charter_dba}}].[MGT].[ApplicationInstanceXREF]
+    		SET [AppId] = '{{ AppId }}'
+    		,[InstanceID] = @IID
+    		,[DateAdded] = '$Date'
+    		WHERE [AppId] = '{{ AppId }}' AND [InstanceID] = @IID
+
+    		--Server/Instance
+    		IF NOT EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[MGT].[ServerInstanceXREF] WHERE [ServerID] = @SID AND [InstanceID] = @IID)
+    		INSERT INTO [{{charter_dba}}].[MGT].[ServerInstanceXREF] ([ServerID],[InstanceID],[DateAdded])
+            VALUES(@SID,@IID,'$Date')
+
+    		IF EXISTS (SELECT TOP 1 1 FROM [{{charter_dba}}].[MGT].[ServerInstanceXREF] WHERE [ServerID] = @SID AND [InstanceID] = @SID)
+    		UPDATE [{{charter_dba}}].[MGT].[ServerInstanceXREF]
+    		SET [ServerID] = @SID
+    		,[InstanceID] = @IID
+    		,[DateAdded] = '$Date'
+    		WHERE [ServerID] = @SID AND [InstanceID] = @IID"
+
+    Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username {{ username }} -password {{ password }}
+  no_log: false
+  failed_when: false
+  register: row_insert
+
+- name: Protected Output - Insert Row in ServerList table
+  debug:
+    var: "row_insert | combine({'cmd': row_insert.cmd | replace(password, '<PASSWORD HIDDEN>')})"
+  failed_when: row_insert.rc

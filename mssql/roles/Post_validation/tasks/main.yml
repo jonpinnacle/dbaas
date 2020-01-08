@@ -1,0 +1,361 @@
+---
+
+- name: db checklist status post for Post-Check
+  include: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Post-Check"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "POST-Check for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- name: Create temp directory
+  win_file:
+    path: "{{ ansible_directory }}"
+    state: directory
+
+- name: Check SQL is running
+  win_service:
+      name: MSSQLSERVER
+  register: sqlserver
+  failed_when: sqlserver is not defined
+  ignore_errors: yes
+
+- debug: msg="The current username of SQL is {{ sqlserver.username }}"
+- debug: msg="The current state of SQL is {{ sqlserver.state }}"
+
+- name: Check SQL agent is running
+  win_service:
+      name: SQLServerAgent
+  register: sqlagent
+  failed_when: sqlagent is not defined
+  ignore_errors: yes
+
+- debug: msg="The current username for  SQL agent is {{ sqlagent.username }}"
+- debug: msg="The current state of SQL agent is {{ sqlagent.state }}"
+
+- name: Check Integration Services is running
+  win_service:
+      name: MsDtsServer120
+  register: integration_service
+  failed_when: integration_service is not defined
+  ignore_errors: yes
+
+- debug: msg="The current username for Integration Services is {{ integration_service.username }}"
+- debug: msg="The current state of Integration Services is {{ integration_service.state }}"
+
+- name:  Check SSMS is running
+  win_template:
+    src: "SSMS_status.ps1.j2"
+    dest: "{{ ansible_directory }}\\SSMS_status.ps1"
+  diff: false
+
+- name: Run the ssms check script
+  win_shell: "{{ ansible_directory }}\\SSMS_status.ps1"
+  register: ssms
+
+- name:  Validate Jobs
+  win_template:
+    src: "SqlJobValidation.SQL2.j2"
+    dest: "{{ ansible_directory }}\\SqlJobValidation.SQL2.ps1"
+  diff: false
+
+- name: Run the validate job script
+  win_shell: "{{ ansible_directory }}\\SqlJobValidation.SQL2.ps1"
+  register: validate_jobs
+
+- name: check Domain Firewall disabled or not
+  win_shell: "netsh advfirewall show allprofiles state"
+  register: firewall_status
+
+
+- name: Check  TCP Chimney setting off or on
+  win_shell: "netsh int tcp show global | Select-String -Pattern 'Chimney'"
+  register: chimney_status
+
+- debug: msg="{{ chimney_status.stdout_lines[1]|replace(' ', '') }}"
+
+- name: Check IBM driver installed or not
+  win_shell: "Get-WmiObject Win32_PnPSignedDriver| select devicename | where {$_.devicename -like '*ibm*'}"
+  register: ibm_driver_status
+  ignore_errors: yes
+
+- debug: msg="{{ ibm_driver_status.stdout }}"
+
+
+- name: Check Oracle driver installed or not
+  win_shell: "Get-WmiObject Win32_PnPSignedDriver| select devicename | where {$_.devicename -like '*oracle*'}"
+  register: oracle_driver_status
+  ignore_errors: yes
+
+- debug: msg="{{ oracle_driver_status.stdout }}"
+
+- name: Check for power settings
+  win_shell: "powercfg -getactivescheme"
+  register: power_plan
+
+- debug: msg="{{ power_plan.stdout }}"
+
+
+- name: check for full SQL version
+  win_shell: "Invoke-SqlCmd -QueryTimeout 0 -query 'select @@version' | fl; exit"
+  register: full_sql_version
+
+- debug: msg="{{ full_sql_version.stdout_lines }}"
+
+- name: check for sa password is in password table
+  win_shell: "Invoke-SqlCmd -QueryTimeout 0 -query 'SELECT TOP 1 1 FROM [{{ charter_dba }}].[PWD].[Passwords] WHERE ServerName = {{ ansible_hostname }} AND Username = 'sa''"
+  register: sa_password_status
+  ignore_errors: true
+
+- debug: msg="{{ sa_password_status }}"
+
+- name: Check SQL mail server is running or not
+  win_shell: "Invoke-SqlCmd -QueryTimeout 0 -query 'msdb.dbo.sysmail_help_status_sp'"
+  register: sql_mail_status
+
+- debug: msg="{{ sql_mail_status.stdout_lines[3] }}"
+
+
+- name: check for Maxdop value
+  win_shell: "Invoke-SqlCmd -QueryTimeout 0 -query \"SELECT value_in_use FROM sys.configurations WHERE description = 'maximum degree of parallelism'\""
+  register: maxdop_value
+
+- debug: msg="value of max dop is {{ maxdop_value.stdout_lines[3]|replace(' ', '') }}"
+
+
+- name: check for Max memory value
+  win_shell: "Invoke-SqlCmd -QueryTimeout 0 -query \"SELECT value FROM sys.configurations WHERE description = 'maximum size of server memory (MB)'\""
+  register: max_memory
+
+- debug: msg=" value for Max memory is {{ max_memory.stdout_lines[3]|replace(' ', '') }}"
+
+- name: check for Min memory value
+  win_shell: "Invoke-SqlCmd -QueryTimeout 0 -query \"SELECT value FROM sys.configurations WHERE description = 'Minimum size of server memory (MB)'\""
+  register: min_memory
+
+- debug: msg=" value for Min memory is {{ min_memory.stdout_lines[3]|replace(' ', '') }}"
+
+- name: check dbmail is running or not
+  win_shell: "Invoke-SqlCmd -QueryTimeout 0 -query 'Exec msdb.dbo.sysmail_help_status_sp'"
+  register: db_mail_status
+
+- name: check that profile is set up
+  win_shell: "Invoke-SqlCmd -QueryTimeout 0 -query 'SELECT name FROM msdb.dbo.sysmail_profile'"
+  register: profile_status
+
+- name: check that account is set up
+  win_shell: "Invoke-SqlCmd -QueryTimeout 0 -query 'SELECT name FROM msdb.dbo.sysmail_account'"
+  register: account_setup_status
+
+
+- set_fact:
+    checklist:
+    - name: SQL Sever status
+      expected_value: "running"
+      actual_value: "{{ sqlserver.state }}"
+      status: "{% if sqlserver.state == 'running' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: SQLServerAgent status
+      expected_value: "running"
+      actual_value: "{{ sqlagent.state }}"
+      status: "{% if sqlagent.state == 'running' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Integration Services status
+      expected_value: "running"
+      actual_value: "{{  integration_service.state }}"
+      status: "{% if  integration_service.state == 'running' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Validate standard service accounts for SQL server
+      expected_value: ""
+      actual_value: "{{ sqlserver.username }}"
+      status: "{% if  sqlserver.username == 'NT Service\\svc_sqlmail' or 'NT Service\\SVSQLPRD' or 'NT Service\\svc_sqlmail' or 'NT Service\\svc_sqlmail' or 'NT Service\\sqlman' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Validate standard service accounts for SQL agent
+      expected_value: ""
+      actual_value: "{{ sqlagent.username }}"
+      status: "{% if  sqlagent.username == 'NT Service\\svc_sqlmail' or 'NT Service\\SVSQLPRD' or 'NT Service\\svc_sqlmail' or 'NT Service\\svc_sqlmail' or 'NT Service\\sqlman' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+
+    - name: Validate standard service accounts for integration service
+      expected_value: ""
+      actual_value: "{{ integration_service.username }}"
+      status: "{% if  integration_service.username == 'NT Service\\svc_sqlmail' or 'NT Service\\SVSQLPRD' or 'NT Service\\svc_sqlmail' or 'NT Service\\svc_sqlmail' or 'NT Service\\sqlman' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+
+    - name: Validate all SQL DBA Jobs
+      expected_value: "Pass"
+      actual_value: "{{  validate_jobs.stdout }}"
+      status: "{% if  validate_jobs.stdout == 'Pass' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Check SSMS service is  installed or not
+      expected_value: "PASS"
+      actual_value: "{{ ssms.stdout|replace('\n', '') }}"
+      status: "{% if ssms.stdout|replace('\n', '') == 'PASS' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+
+    - name: Validate TCP Chimney setting
+      expected_value: "Disabled"
+      actual_value: '{{ chimney_status.stdout_lines[1]|replace(" ", "") }}'
+      status: "{% if 'disabled' in chimney_status.stdout %}
+                    Passed
+                {% else %}
+                    Failed
+                {% endif %}"
+
+    - name: Check for Windows Domain firewall disabled
+      expected_value: "OFF"
+      actual_value: "{{  firewall_status.stdout_lines }}"
+      status: "{% if 'OFF' in firewall_status.stdout %}
+                    Passed
+                {% else %}
+                    Failed
+                {% endif %}"
+
+    - name: Check for Power Management Set correctly
+      expected_value: "High performance"
+      actual_value: "{{  power_plan.stdout_lines }}"
+      status: "{% if 'High performance' in power_plan.stdout %}
+                    Passed
+                {% else %}
+                    Failed
+                {% endif %}"
+
+
+    - name: Check for SQL mail server is running or not
+      expected_value: "STARTED"
+      actual_value: "{{  sql_mail_status.stdout_lines[3] }}"
+      status: "{% if 'STARTED' in  sql_mail_status.stdout%}
+                    PASSED
+                {% else %}
+                    Failed
+                {% endif %}"
+
+    - name: Validate MaxDop
+      expected_value: "{{ expected_maxdop }}"
+      actual_value: '{{  maxdop_value.stdout_lines[3]|replace(" ", "") }}'
+      status: "{% if  maxdop_value.stdout_lines[3]|replace(' ', '') == expected_maxdop -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Validate Max Memory
+      expected_value: "{{ expected_max_memory }}"
+      actual_value: '{{  max_memory.stdout_lines[3]|replace(" ", "") }}'
+      status: "{% if  max_memory.stdout_lines[3]|replace(' ', '') == expected_max_memory -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Validate Min Memory
+      expected_value: "{{ expected_min_memory }}"
+      actual_value: '{{  min_memory.stdout_lines[3]|replace(" ", "") }}'
+      status: "{% if  min_memory.stdout_lines[3]|replace(' ', '') == expected_min_memory -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+
+    - name: check that dbmail is running
+      expected_value: "STARTED"
+      actual_value: "{{ db_mail_status.stdout_lines[3] }}"
+      status: "{% if  db_mail_status.stdout_lines[3] == 'STARTED' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: check that profile is set up
+      expected_value: "CHTR"
+      actual_value: "{{ profile_status.stdout_lines[3] }}"
+      status: "{% if  profile_status.stdout_lines[3] == 'CHTR' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: check that account is set up
+      expected_value: "STARTED"
+      actual_value: "{{ account_setup_status.stdout_lines[3] }}"
+      status: "{% if  account_setup_status.stdout_lines[3] == 'CHTR' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: validate oracle driver is installed or not
+      expected_value: ""
+      actual_value: "{{ oracle_driver_status.stdout }}"
+      status: "{% if  oracle_driver_status.stdout == '' -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+
+    - name: validate IBM driver is installed or not
+      expected_value: ""
+      actual_value: "{{ ibm_driver_status.stdout }}"
+      status: "{% if  ibm_driver_status.stdout == '' -%}FAILED
+               {%- else -%}PASSED
+               {%- endif %}"
+
+    - name: Full SQL version
+      expected_value: ""
+      actual_value: "{{  full_sql_version.stdout_lines }}"
+      status: ""
+
+- name: Debug the checklist
+  debug:
+    msg: "{{ checklist }}"
+
+- name: Store the result in a json
+  win_copy:
+    dest: "{{ ansible_tmp }}/post_check_validation.json"
+    content: "{{ checklist }}"
+
+
+- name: db checklist status file upload for Post Check
+  include: db_checklist_status_file.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Post-Check"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload Checklist"
+    task_message: "Post-check {{ ansible_hostname }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    standard_task_id: "{{ standard_task_id }}"
+    logfile_path:  "{{ ansible_tmp }}/post_check_validation.json"
+  tags:
+  - apex_api
+
+- name: db checklist status post for Post Check
+  include: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Post-Check"
+    task_id: "{{ ticket_ref }}"
+    standard_task_id: "{{ standard_task_id }}"
+    task_status: "{% if checklist | json_query('[?status == `FAILED`]') | length > 1 -%}FAILED
+                  {%- else -%}SUCCESSFUL
+                  {%- endif %}"
+    task_message: "Post-check for {{ ansible_hostname }} "
+    tags:
+    - apex_api
+
+- name: Check for Post Check  Failures
+  fail:
+    msg: "{% if checklist | json_query('[?status == `FAILED`]') | length == 1 -%}You have 1 failed check
+          {%- else -%}You have {{ checklist | json_query('[?status == `FAILED`]') | length }} failed checks
+          {%- endif %}"
+  when: checklist | json_query('[?status == `FAILED`]') | length > 0
+  tags:
+    - postcheck_fail

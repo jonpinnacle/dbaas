@@ -1,0 +1,27 @@
+---
+rac_install: "{% if ansible_play_hosts > 1 -%}true
+              {%- else -%}false
+              {%- endif %}"
+
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+oracle_compat_version: "{{ oracle_version | regex_replace('^([0-9]{1,2}.[0-9]{1,}).*','\\1') }}"
+
+# location for temporary files
+oracle_tmp: /u01/tmp/{{ oracle_version }}/ACFS
+
+oracle_user: oracle
+
+
+oracle_group: oinstall
+
+oracle_home: "{{ install_base }}/{{ oracle_version }}/grid_1"
+
+# shell environment for the oracle user
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ oracle_sid }}"
+  ORACLE_UNQNAME: "{{ oracle_asm_name }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ oracle_home }}/bin:{{ ansible_env.PATH }}"

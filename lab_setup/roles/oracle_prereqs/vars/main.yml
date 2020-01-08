@@ -1,0 +1,20 @@
+---
+
+oracle_home: "{{ oracle_base }}/oracle/product/{{ oracle_version }}/{{ oracle_db_home }}"
+
+oracle_user: { name: oracle, id: 5001, group: oinstall }
+
+oracle_groups:   
+    - { name: oinstall, ID: 54321 }
+    - { name: dba, ID: 54322 }
+    - { name: asmoper, ID: 54328 }
+    - { name: asmadmin, ID: 54329 }
+    - { name: asmdba, ID: 54327 }
+
+# shell environment for the oracle user
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}/oracle"
+  ORACLE_SID: "{{ oracle_db_name }}"
+  ORACLE_UNQNAME: "{{ oracle_db_name }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  NLS_LANG: "American_America.UTF8"

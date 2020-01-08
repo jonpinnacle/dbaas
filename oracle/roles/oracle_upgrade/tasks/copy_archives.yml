@@ -1,0 +1,29 @@
+---
+
+- name: create the precheck directory to the oracle user
+  file:
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}/db_precheck"
+    state: directory
+    recurse: yes
+
+- name: check for the marker
+  stat:
+    path: "{{ oracle_tmp }}/db_precheck/copied"
+  register: unzipped
+  ignore_errors: yes
+
+- name: unzip preupgrade scripts
+  unarchive: 
+    src: "{{ oracle_installer_path }}/UPGRADE/{{ preupgrade_scripts_file }}" 
+    dest: "{{ oracle_tmp }}/db_precheck" 
+    remote_src: yes 
+    keep_newer: true
+    validate_certs: no
+  when: unzipped.stat.exists == false
+  
+- name: place a marker for the completion
+  file:
+    path: "{{ oracle_tmp }}/db_precheck/copied"
+    state: touch
+  when: unzipped.stat.exists == false

@@ -1,0 +1,8 @@
+- name: copy Add SQL Windows Accts file
+  win_template: 
+    src: ../templates/Add-SQL-Windows-Acct.j2
+    dest: C:\Ansible\Temp\Add-SQL-Windows-Acct.ps1
+
+- name: Add SQL Windows Accts
+  win_shell: |
+    C:\Ansible\Temp\Add-SQL-Windows-Acct.ps1  > C:\Ansible\Logs\Add-SQL-Windows-Acct.log 

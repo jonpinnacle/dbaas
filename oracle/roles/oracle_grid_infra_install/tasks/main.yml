@@ -1,0 +1,177 @@
+---
+- include_vars: secrets.yml
+  no_log: True
+
+- name: check Grid is running
+  shell: ps -ef | grep d.bin | grep -v grep | grep ohas
+  register: ohas_grid_check
+  changed_when: False
+  ignore_errors: True
+
+- include_tasks: copy_archives.yml
+  when: ohas_grid_check.stdout_lines | length == 0
+
+- name: get asm disk paths - {{ asm_data_group }}
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ asm_data_pattern }}"
+    use_regex: no
+  register: asm_data_paths_find_result
+
+# - debug:
+#     msg: "{{ asm_data_paths_find_result }}"
+
+
+# - debug:
+#     msg: "{{ asm_disk_location }}"
+
+
+- name: get asm disk paths - {{ asm_reco_group }}
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ asm_reco_pattern }}"
+    use_regex: no
+  register: asm_reco_paths_find_result
+
+- name: get asm disk paths - {{ asm_ocr_group }}
+  find:
+    paths: "{{ asm_disk_location }}"
+    file_type: any
+    patterns: "{{ asm_ocr_pattern }}"
+    use_regex: no
+  register: asm_ocr_paths_find_result
+  when: grid_install_mode == "CRS_CONFIG" or grid_install_mode == "CRS_SWONLY" or grid_install_mode == "UPGRADE"
+
+- name: set cluster_nodes_table
+  set_fact:
+    cluster_nodes_table: "{{ cluster_nodes_table | default([]) }} + [ '{{ item }}:{{ item | regex_replace('([^.]*)(.*)','\\1-vip\\2')}}' ]"
+  with_items: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+  when: grid_install_mode == "CRS_CONFIG" or grid_install_mode == "CRS_SWONLY" or grid_install_mode == "UPGRADE"
+
+- include_tasks: set_net_string.yml
+  when: inventory_hostname == master_node and (grid_install_mode == "CRS_CONFIG" or grid_install_mode == "CRS_SWONLY" or grid_install_mode == "UPGRADE")
+
+- name: get oracle grid home
+  shell: "ps -ef | grep ohasd | grep {{ oracle_base }}/{{ grid_version }}/ |  grep -v grep | awk -F ' ' '{ print $8 }'"
+  changed_when: False
+  register: oracle_ohasd_process
+
+- name: set grid home
+  set_fact:
+       oracle_grid_home: "{{ oracle_ohasd_process.stdout | regex_replace('/bin/ohasd.bin', '') }}"
+
+- include_tasks: prep_rsp_file.yml
+  when: inventory_hostname == master_node
+
+- name: check Grid is running
+  shell: ps -ef | grep d.bin | grep -v grep | grep ohas
+  register: ohas_grid_check
+  changed_when: False
+  ignore_errors: True
+
+# - name: host checklist Start  for Grid Install
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: 'GI Install'
+#       checklist_category: 'Install'
+#       gi_install_status: 'STARTED'
+#       ticket_ref: "{{ ticket_ref }}"
+#       task_desc: 'Install Grid'
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Grid Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "Install Grid Infrastructure for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id_val }}"
+  tags:
+  - apex_api
+
+- include_tasks: grid_install.yml
+  when: ohas_grid_check.stdout_lines | length == 0
+
+# - include_tasks: execute_Configtools.yml
+#   when: ohas_grid_check.stdout_lines | length == 0
+
+- name: check ASM is running
+  shell: ps -ef|grep asm_smon|grep -v grep
+  register: asm_running_check
+  failed_when: asm_running_check.stdout_lines | length == 0
+  changed_when: False
+
+- name: get oracle_sid
+  shell: ps -ef | grep smon | grep {{ oracle_asm_name }} | grep -v grep | awk '{ print $8 }'
+  register: ps_grep_smon
+  changed_when: False
+
+- name: set oracle_sid
+  set_fact:
+    oracle_sid: "{{ ps_grep_smon.stdout | regex_replace('asm_smon_(.*)', '\\1') }}"
+ #when: asm_running_check.stdout_lines | length =! 0
+
+- name: db checklist status post for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Grid Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "IN_PROGRESS"
+    standard_task_id: "{{ standard_task_id_val }}"
+    task_message: "configuring Disk Groups for {{ ansible_hostname }} "
+  when: inventory_hostname == master_node
+  tags:
+  - apex_api
+
+- include_tasks: configure_disk_groups.yml
+  when: inventory_hostname == master_node
+- fail:
+    msg: 'DiskGroup Creation Failed'
+  when:  diskgroup_failed
+
+- name: db checklist status post for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Grid Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "FAILED"
+    standard_task_id: "{{ standard_task_id_val }}"
+    task_message: "Grid Install for {{ ansible_hostname }} "
+  when:
+    - inventory_hostname == master_node
+    - diskgroup_failed
+  tags:
+  - apex_api
+
+- name: db checklist status post for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Grid Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "SUCCESSFUL"
+    standard_task_id: "{{ standard_task_id_val }}"
+    task_message: "Grid Install for {{ ansible_hostname }} "
+  when:
+    - inventory_hostname == master_node
+    - diskgroup_failed == False
+  tags:
+  - apex_api

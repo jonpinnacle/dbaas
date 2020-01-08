@@ -1,0 +1,381 @@
+---
+- include_vars: Virtual-Secrets.yml
+  no_log: True
+
+- name: Create Ansible Log and Temp  Directory
+  win_file:
+    path: "{{ ansible_directory }}"
+    state: directory
+  loop:
+  - "{{ ansible_tmp }}"
+  - C:\Ansible\Logs
+  loop_control:
+    loop_var: ansible_directory
+
+- name: SystemRequirement
+  win_shell: |
+    Import-Module Storage
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO') | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.ConnectionInfo') | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SqlWmiManagement') | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.ManagedDTS') | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.AnalysisServices") | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SqlWmiManagement") | out-null
+    [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.VisualBasic') | Out-Null
+    # Load the IntegrationServices Assembly
+    [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.IntegrationServices") | Out-Null
+
+- name: Turn Off Smartscreen
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer
+    name: SmartScreenEnabled
+    type: string
+    data: Off
+  tags:
+  - regedit
+
+- include: obtain_sa_password.yml
+  no_log: True
+
+- include: insert_row_in_serverlist_table.yml
+
+- name: Relable Drives
+  win_shell: |
+    label F: System
+    label G: Data
+    label H: Backups
+    label I: Tempdb
+    label J: Logs
+
+- include: Create_Directories.yml
+  vars:
+    msfolders: "{{ inputfolder.folders }}"
+  when: inputfolder.msql_version == SqlVersion
+  loop: "{{ folders_to_be_moved }}"
+  loop_control:
+    loop_var: inputfolder
+
+- name: Fix DTC CID and Set Security
+  win_shell: |
+    Stop-Dtc -DtcName "Local" –Confirm:$False
+    Uninstall-Dtc –Confirm:$False
+    Install-Dtc -LogPath "C:\windows\system32\MSDtc" -StartType "AutoStart"
+    Start-Dtc -DtcName "Local"
+    Set-DtcNetworkSetting -DtcName Local -AuthenticationLevel Incoming -InboundTransactionsEnabled 1 -OutboundTransactionsEnabled 1 -RemoteClientAccessEnabled 1 -RemoteAdministrationAccessEnabled 1 -XATransactionsEnabled 1 -confirm:$false
+
+###########################################
+## Didn't see any modules for netsh      ##
+## may need to remain as a shell for now ##
+###########################################
+- name: Disable TCP Chimney
+  win_shell: |
+    netsh int tcp set global chimney=disabled
+    netsh int tcp set global rss=disabled
+    netsh int tcp show global
+    ############################################################################
+    ## This can use the win_regedit module                                    ##
+    ## (https://docs.ansible.com/ansible/2.5/modules/win_regedit_module.html) ##
+    ############################################################################
+    Set-ItemProperty -Path "HKLM:\system\CurrentControlSet\Services\TCPIP\Parameters" -name DisableTaskOffload -Type DWORD -Value 1
+# - name: regedit to DisableTaskOffload
+#   win_regedit:
+#     path: HKLM:\system\CurrentControlSet\Services\TCPIP\Parameters
+#     name: DisableTaskOffload
+#     type: dword
+#     data: 1
+
+- name: Set Power Setting
+  win_power_plan:
+    name: high performance
+
+#############################################################################
+## win_firewall module requires WMF 5.1 or higher                          ##
+##                                                                         ##
+## For our lab (and as a Proof-of-Concept for Charter), I have created the ##
+## "Win_Update_PowerShell.yml" Playbook in the 'Technologent_lab' folder   ##
+## That playbook uses the `win_chocolatey` module to update PS to 5.1      ##
+#############################################################################
+- name: Disable Windows Frewall
+  win_firewall:
+    state: disabled
+    profiles:
+    - Domain
+    - Private
+    - Public
+
+# - name: Get NTFS Allocation sizes
+#   win_shell: |
+#     $wql = "SELECT Label, Blocksize, Name FROM Win32_Volume WHERE FileSystem='NTFS'"
+#     Get-WmiObject -Query $wql -ComputerName '.' | Select-Object Label, Blocksize, Name
+
+- name: Get Disk facts
+  win_disk_facts:
+
+- include_tasks: Check_free_space.yml
+  loop:
+  - { letter: D, min_size: 50000000}
+  - { letter: E, min_size: 10000000000}
+  - { letter: F, min_size: 10000000000}
+  - { letter: G, min_size: 10000000000}
+  - { letter: H, min_size: 10000000000}
+  - { letter: I, min_size: 10000000000}
+  - { letter: J, min_size: 10000000000}
+  loop_control:
+    loop_var: drive
+
+- name: Enable the ability to map a network drive
+  win_regedit:
+    path: HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters
+    name: "{{ registry_name }}"
+    type: dword
+    data: 0
+  loop:
+  - RequireSecureNegotiate
+  - RequireSecuritySignature
+  loop_control:
+    loop_var: registry_name
+
+- name: Create desktop directory for interactive processes (MSFT SSIS fix)
+  win_file:
+    path: "{{ desktop_directory }}"
+    state: directory
+  loop:
+  - C:\Windows\SysWOW64\config\systemprofile\Desktop
+  - C:\Windows\system32\config\systemprofile\Desktop
+  loop_control:
+    loop_var: desktop_directory
+
+- include: Copy_and_Import_Carbon_SQL_Tools.yml
+
+- include: Set-Windows-Security.yml
+
+# Need to remove this while running on Charter Environment
+# Missing "$unc\SQL2008R2" SQLServer2005_BC_x64*.msi" in given media
+- name: Install Install-Backward-Compatibility-Objects
+  win_package:
+    path: 'D:\Install\SQL{{ SqlVersion }}\SQLServer2005_BC_x64.msi'
+
+####################################################################
+## Possibly use 'win_package' for both IBM and Oracle Drivers     ##
+## (https://docs.ansible.com/ansible/2.4/win_package_module.html) ##
+##                                                                ##
+## I attempted below but was unable to get this working.          ##
+####################################################################
+- name: Using this to validate whether IBM client installed or not
+  win_package:
+    path: 'D:\Install\IBM\Iseries_64 bit\setup.exe'
+    # product_id: '{CF2BEA3C-26EA-32F8-AA9B-331F7E34BA97}'
+    creates_path: 'D:\Program Files (x86)\IBM\Client Access\cwbinarp.exe'
+    arguments: -s -f1D:\Install\IBM\IBMClient.iss
+  register: IBM_check
+
+- name: Install IBM Driver
+  win_shell: |
+    $cmd = "D:\Install\IBM\Iseries_64 bit\setup.exe"
+    $arg = "-s -f1D:\Install\IBM\IBMClient.iss"
+    start-process -wait $cmd $arg
+  when: IBM_check.changed != false
+  # win_package:
+  #   path: D:\Install\IBM\Iseries_64 bit\setup.exe
+  #   # product_id: '{CF2BEA3C-26EA-32F8-AA9B-331F7E34BA97}'
+  #   arguments: -s -f1D:\Install\IBM\IBMClient.iss
+  # register: ibm_drvr_install
+
+- name: Find latest IBM log file
+  win_find:
+    paths: D:\Install\IBM\
+    age: -3m
+    patterns: 'setup.log'
+    recurse: yes
+  register: IBMlogfile
+  when: IBM_check.changed != false
+
+- name: read output
+  win_shell:
+    'gc "{{ IBMlogfile.files[0].path }}"'
+  register: IBMchecklog
+  failed_when: '"ResultCode=-" in IBMchecklog.stdout'
+  when: IBM_check.changed != false
+
+
+- name: Install Oracle Driver
+  win_shell: |
+     $PathExist = Test-Path "D:\Oracle\product\12.1.0"
+     If ( $PathExist -eq $false )
+      {
+      Start-Process -wait "D:\Install\Oracle\12C\winnt_12102_client32\client32\setup.exe" "-silent -nowelcome -noconfig -nowait -responseFile D:\Install\Oracle\12C\winnt_12102_client32\Oracle_32Bit_Install_ResponseFile-12C.rsp"
+      Start-Process -wait "D:\Install\Oracle\12C\winx64_12102_client\client\setup.exe" "-silent -nowelcome -noconfig -nowait -responseFile D:\Install\Oracle\12C\winx64_12102_client\Oracle_64Bit_Install_ResponseFile-12C.rsp"
+      }
+# - name: Install Oracle Driver (32bit)
+#   win_package:
+#     path: D:\Install\Oracle\12C\winnt_12102_client32\client32\setup.exe
+#     arguments: -silent -nowelcome -noconfig -nowait -responseFile D:\Install\Oracle\12C\winnt_12102_client32\Oracle_32Bit_Install_ResponseFile-12C.rsp
+#     creates_path: D:\Oracle\product\12.1.0\client_3
+#   register: oracle_drvr32_install
+
+# - name: Install Oracle Driver (64bit)
+#   win_package:
+#     path: D:\Install\Oracle\12C\winx64_12102_client\client\setup.exe
+#     arguments: -silent -nowelcome -noconfig -nowait -responseFile D:\Install\Oracle\12C\winx64_12102_client\Oracle_64Bit_Install_ResponseFile-12C.rsp
+#     creates_path: D:\Oracle\product\12.1.0\client_4
+#   register: oracle_drvr64_install
+
+- include: Use-Domain-svt-acct.yml
+
+- name: Set Memory
+  win_shell: |
+    $Mem = gwmi Win32_OperatingSystem | % { $_.TotalVisibleMemorySize }
+    $MaxMem = [System.Math]::Round(($mem/1024) * .8, 0)
+    $MinMem = [System.Math]::Round($maxmem * .5, 0)
+    $Qry = "EXEC sys.sp_configure N'show advanced options', N'1'  RECONFIGURE WITH OVERRIDE
+            EXEC sys.sp_configure N'max server memory (MB)', N'$MaxMem'
+            RECONFIGURE WITH OVERRIDE
+            EXEC sys.sp_configure N'min server memory (MB)', N'$MinMem'
+            RECONFIGURE WITH OVERRIDE
+            EXEC sys.sp_configure N'show advanced options', N'0'  RECONFIGURE WITH OVERRIDE"
+    Invoke-SqlCmd -query $Qry -serverinstance "{{ SName  }}" -database "master"
+
+- name: Set Max Dop
+  win_shell: |
+    $totalcores = $(Get-WmiObject -class win32_processor).numberofcores
+    If ("$totalcore" -gt "1"){ $allcores = ($totalcores | Measure-Object -Sum).Sum } else { $allcores = $totalcores }
+
+    $MaxDop = [System.Math]::Round($allcores/1.5, 0)
+    If ($MaxDop -gt 8) { $MaxDop = "8" }
+    $Qry = "EXEC sys.sp_configure N'show advanced options', N'1'  RECONFIGURE WITH OVERRIDE EXEC sys.sp_configure N'max degree of parallelism', N'$MaxDop' RECONFIGURE WITH OVERRIDE EXEC sys.sp_configure N'show advanced options', N'0'  RECONFIGURE WITH OVERRIDE"
+    $allcores
+    $totalcores
+    $Qry
+
+    Invoke-SqlCmd -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+  register: output
+- set_fact:
+    Allcores: "{{ output.stdout_lines[0] }}"
+
+#Got error "Invalid object name 'SQLDBA.dbo.TrackLoginManagement'."
+- name: Change Sa Password
+  win_shell: |
+    $Qry = "ALTER LOGIN [sa] WITH PASSWORD=N'{{ SaPw }}'"
+    $Qry
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+  no_log: True
+  failed_when: false
+  register: change_sa
+
+- name: Protected Output - Change Sa Password
+  debug:
+    var: "change_sa | combine({'cmd': change_sa.cmd | replace(SaPw, '<PASSWORD HIDDEN>')})"
+  failed_when: change_sa.rc
+
+- name: Insert Row in Password Table
+  win_shell: |
+    $Date = Get-Date -Format g
+    $Date
+    $Qry = "IF NOT EXISTS (SELECT TOP 1 1 FROM [CHARTER_DBA].[PWD].[Passwords] WHERE ServerName = '{{ ansible_hostname }}' AND Username = 'sa')
+            INSERT INTO [CHARTER_DBA].[PWD].[Passwords] ([GroupName],[ServerName],[UserName],[Password],[Type])
+            VALUES('{{ GName }}','{{ ansible_hostname }}','sa', [CHARTER_DBA].[dbo].[FNC_ENCRIPTION_PW]('{{ SaPw }}') ,'SQL')
+            IF EXISTS (SELECT TOP 1 1 FROM [CHARTER_DBA].[PWD].[Passwords] WHERE ServerName = '{{ ansible_hostname }}' AND UserName = 'sa')
+            UPDATE [CHARTER_DBA].[PWD].[Passwords]
+            SET [Password] = [CHARTER_DBA].[dbo].[FNC_ENCRIPTION_PW]('{{ SaPw }}')
+            WHERE  ServerName = '{{ ansible_hostname }}' AND UserName = 'sa'"
+    Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username "{{ username }}" -password "{{ password }}"
+  no_log: True
+  failed_when: false
+  register: pass_row_insert
+
+- name: Protected Output - Change Sa Password
+  debug:
+    var: "pass_row_insert | combine({'cmd': pass_row_insert.cmd | replace(SaPw, '<PASSWORD HIDDEN>')})"
+  failed_when: pass_row_insert.rc
+
+- include: Alter-TempDB.yml
+
+- name: Run SQL Configuration Script
+  win_shell: |
+    SQLCMD -S {{ ansible_hostname }} -d "master" -E -x -i "D:\Install\SQL-CFG\SqlCfg.sql"
+    $Qry = "EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', N'Software\Microsoft\MSSQLServer\MSSQLServer', N'BackupDirectory', REG_SZ, N'{{ BuPath }}MSSQL\backups'"
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+- include: Configure-SSIS-Catalog.yml
+
+- include: Optimize-System-Databases.yml
+
+- name: Create Directory
+  win_file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+     - '{{ DataPath }}MSSQL\Data'
+     - '{{ LogPath }}MSSQL\Logs'
+
+
+- name: Uncompressed the Directory
+  win_shell: |
+     'compact /s /u "{{ DataPath }}MSSQL\Data"'
+     'compact /s /u "{{ LogPath }}MSSQL\Logs"'
+
+- include: Install-sqldba-DB.yml
+
+- include: Install-Holding-DB.yml
+
+- include: Import-Client-Parameters.yml
+
+- include: Update-Job-Script.yml
+
+- include: Run-SQL-Jobs-Script.yml
+
+- include: Install-Updated-Code.yml
+
+- include: Enable-TCP-Set-Port.yml
+
+- name: Create MSSQL  Directory under C Drive
+  win_file:
+    path: C:\Program Files\Veritas\NetBackup\DbExt\MsSql
+    state: directory
+
+- include: Net-Backup-Config.yml
+
+- include: Add-SQL-Windows-Acct.yml
+
+- name: Stop SQL service
+  win_service:
+    name: MSSQLSERVER
+    state: stopped
+    force_dependent_services: yes
+
+- name: Remove old tempdb Directory
+  win_file:
+    path: '{{ TempdbPath }}MSSQL\data'
+    state: absent
+#Got below error after restart while accessing sql server
+#FCB::Open failed:
+#Could not open file E:\Tempdb\MSSQL\Data\tempdb.mdf for file number 1.
+#OS error: 3(The system cannot find the path specified.).
+- name: Create MSSQL  Data Directory under temp Drive
+  win_file:
+    path: '{{ TempdbPath }}MSSQL\Data'
+    state: directory
+
+- name: Turn On Smartscreen
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer
+    name: SmartScreenEnabled
+    type: string
+    data: Prompt
+  tags:
+  - smartscreen
+
+- name: Remove ansible temp Directory
+  win_file:
+    path: 'C:\Ansible\Temp'
+    state: absent
+
+- name: Reboot Server
+  win_reboot:
+    pre_reboot_delay: 10
+    post_reboot_delay: 0
+    test_command: whoami
+    reboot_timeout: 600
+    msg: Reboot initiated by Ansible
+    connect_timeout: 5

@@ -1,0 +1,46 @@
+---
+# tasks file for demo_clean
+- name: include variables
+  include_vars: secrets.yml
+  no_log: True
+
+- name: get inventory hosts
+  tower_hosts:
+    tower_host: "{{ awx_uri }}"
+    tower_username: "{{ awx_vm_user }}"
+    tower_password: "{{ tower_pass }}"
+    validate_certs: False
+  register: all_hosts
+
+- name: remove inventory hosts
+  tower_host:
+    tower_host: "{{ awx_uri }}"
+    tower_username: "{{ awx_vm_user }}"
+    tower_password: "{{ tower_pass }}"
+    validate_certs: False
+    name: "{{ item.name }}"
+    inventory: Integration-INV
+    state: absent
+  when: now|int - created|int > 3600
+  vars:
+    created: "{{ lookup('pipe','date -d\"' + item.created + '\" +%s') }}"
+    now: "{{ ansible_date_time.epoch }}"
+  with_items: "{{ all_hosts | json_query('hosts.results[*]') }}"
+
+- name: remove hosts from aws
+  ec2_instance:
+    name: "{{ inventory_hostname }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    instance_ids:
+      - "{{ aws_id.aws_id }}"
+    state: absent
+  when:
+    - now|int - created|int > 3600
+    - aws_id is not undefined
+  vars:
+    created: "{{ lookup('pipe','date -d\"' + item.created + '\" +%s') }}"
+    now: "{{ ansible_date_time.epoch }}"
+    aws_id: "{{ all_hosts | json_query('hosts.results[*].variables')|replace('\"','')|replace('[u','')|replace(']','') }}"
+  with_items: "{{ all_hosts | json_query('hosts.results[*]') }}"

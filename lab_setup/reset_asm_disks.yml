@@ -1,0 +1,32 @@
+---
+
+- name: reset asm disks
+  hosts: '{{ host }}'
+  become: yes
+
+  tasks:
+    - name: get asm disks
+      command: oracleasm listdisks
+      register: asm_disks
+    
+    - name: get mapped disk
+      command: oracleasm querydisk -p {{ item }}
+      register: mapped_disks
+      with_items: "{{ asm_disks.stdout_lines }}"
+
+    - name: delete asm disks
+      command: oracleasm deletedisk {{ item }}
+      with_items: "{{ asm_disks.stdout_lines }}"
+
+    - name: create 'disks' list
+      set_fact:
+        disks: "{{ disks | default([]) }} + [ '{{ item.stdout_lines[1] | regex_replace('([^:]*).*', '\\1') }}' ]"
+      when: item.stdout_lines[1] is not match("/dev/mapper/.*")
+      with_items: "{{ mapped_disks.results }}"
+
+    - name: delete the partition tables
+      parted:
+        device: "{{ item[:-1] }}"
+        number: "{{ item[-1] }}"
+        state: absent
+      with_items: "{{ disks }}"

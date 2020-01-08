@@ -1,0 +1,17 @@
+- name: install AlwaysOn Cluster Setup
+#  hosts: AlwaysOn-Setup
+  hosts: '{{ host }}'
+  tasks:
+    - name: AlwaysOn-Pre-Installation
+      import_role:
+        name: AlwaysOn-Pre-Installation
+        tasks_from: main.yml
+    
+    - name: Pause
+      pause: minutes=1
+
+    - name: AlwaysOn-Setup
+      import_role:
+        name: AlwaysOn-Setup
+        tasks_from: main.yml
+      

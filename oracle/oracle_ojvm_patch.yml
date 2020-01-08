@@ -1,0 +1,12 @@
+---
+
+- name: Execute OJVM Patch
+  hosts: '{{ host }}'
+  any_errors_fatal: true
+  become: yes
+  tasks:
+  - import_role:
+      name: oracle_ojvm_patching
+
+# Required Vars
+# ojvm_patch - Patch filename

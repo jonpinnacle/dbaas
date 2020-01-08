@@ -1,0 +1,51 @@
+---
+- name: get installed products
+  become: yes
+  become_user: "{{ oracle_user }}"
+  environment:
+    ORACLE_SID: "{{ item.value }}"
+    ORACLE_HOME: "{{ item.key }}"
+    PATH: "{{ item.key }}/bin:{{ ansible_env.PATH }}"
+    TMP: "/u01/app/oracle"
+    TMPDIR: "/u01/app/oracle"
+  shell: "sqlplus -S -NOLOGINTIME  / as sysdba @{{ oracle_features_tmp }}/features/product_stats.sql"
+  register: product_stats
+  changed_when: false
+
+
+- name: get installed features
+  become: yes
+  become_user: "{{ oracle_user }}"
+  environment:
+    ORACLE_SID: "{{ item.value }}"
+    ORACLE_HOME: "{{ item.key }}"
+    PATH: "{{ item.key }}/bin:{{ ansible_env.PATH }}"
+    TMP: "/u01/app/oracle"
+    TMPDIR: "/u01/app/oracle"
+  command: sqlplus -S -NOLOGINTIME  / as sysdba @{{ oracle_features_tmp }}/features/feature_stats.sql
+  register: feature_stats
+  changed_when: false
+
+
+- name: Features Destination
+  set_fact:
+    features_destination: "{{ oracle_features_tmp }}features/{{ inventory_hostname | replace('.', '_') }}"
+
+- debug:
+    msg: "{{ features_destination }}"
+
+- name: write feature_stats to a file
+  copy:
+    content: "{{ feature_stats.stdout }}"
+    dest: "{{ features_destination }}_feature_stats.csv"
+
+- name: write product_stats to a file
+  copy:
+    content: "{{ product_stats.stdout }}"
+    dest: "{{ features_destination }}_product_stats.csv"
+
+- name: Convert CSV to JSON for features
+  command: "python {{ oracle_features_tmp }}/features/csv2json.py {{ features_destination }}_feature_stats.csv f"
+
+- name: Convert CSV to JSON for features
+  command: "python {{ oracle_features_tmp }}/features/csv2json.py {{ features_destination }}_product_stats.csv p"

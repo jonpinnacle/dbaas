@@ -1,0 +1,18 @@
+ansible_directory : C:\Ansible\Temp
+ansible_tmp: C:\Ansible\Temp
+
+username: admin
+
+DBA_AD_GROUP: EG-SQLAdmins
+SQLInst: "142.136.196.228"
+cluster_name: "TESTE2016C001$"
+listner_name: "TESTE2016DVS0"
+
+standard_task_id: "0"
+ticket_ref: "TEST123"
+apex_url: "https://apex-dev.techlab.com:8443/ords/invent2"
+checklist_id: "TEST456"
+
+ps1_files:
+  - node_joined_to_cluster.ps1
+  - quorum_defined.ps1

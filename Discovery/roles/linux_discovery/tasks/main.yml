@@ -1,0 +1,19 @@
+---
+# tasks file for linux_discovery
+- debug:
+    var: "{{ ansible_play_hosts }}"
+
+- debug:
+    var: "{{ ansible_play_batch }}"
+
+- debug:
+    var: "{{ ansible_play_hosts_all }}"
+
+- debug:
+    var: "{{ cluster_nodes }}"
+
+- name: Template a json file.
+  template:
+    src: linux_discovery.j2
+    dest: "/tmp/{{ inventory_hostname }}.json"
+  delegate_to: localhost

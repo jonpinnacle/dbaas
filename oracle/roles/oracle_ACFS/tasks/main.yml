@@ -1,0 +1,237 @@
+---
+- name: get all processes
+  shell: ps -ef
+  register: ps_all
+  changed_when: False
+
+- name: wait for 5 minutes to let the precesses settle
+  pause:
+    minutes: 5
+
+- name: get all processes
+  shell: ps -ef
+  register: ps_all
+  changed_when: False
+
+- name: get oracle_sid
+  shell: ps -ef | grep smon | grep {{ oracle_asm_name }} | grep -v grep | awk '{ print $8 }'
+  register: ps_grep_smon
+  changed_when: False
+
+- name: set oracle_sid
+  set_fact:
+    oracle_sid: "{{ ps_grep_smon.stdout | regex_replace('asm_smon_(.*)', '\\1') }}"
+
+# - name: host checklist Start  for Grid Install
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       host_name: "{{ ansible_hostname }}"
+#       ticket_ref: "{{ ticket_ref }}"
+#       checklist_type: 'ACFS Config'
+#       checklist_category: 'Install'
+#       gi_install_status: 'STARTED'
+#       task_desc: 'acfs check'
+#   tags:
+#   - apex_api
+
+
+- name: db checklist status post for OJVM PATCHING
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "ACFS Config"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "ACFS Check for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- import_tasks: acfs_driver_check.yml
+  tags: acfs_install
+
+# - name: host checklist Start  for Grid Install
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       host_name: "{{ ansible_hostname }}"
+#       ticket_ref: "{{ ticket_ref }}"
+#       checklist_type: 'ACFS Config'
+#       checklist_category: 'Install'
+#       gi_install_status: 'IN_PROGRESS'
+#       task_desc: 'acfs install'
+#   tags:
+#   - apex_api
+
+
+- name: db checklist status post for OJVM PATCHING
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "ACFS Config"
+    task_id: "{{ ticket_ref }}"
+    task_status: "IN_PROGRESS"
+    task_message: "ACFS install for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- include_tasks: acfs_driver_install.yml
+  when: not acfsdriver_installed
+  tags: acfs_install
+
+- name: create tmp dir
+  file:
+    group: "{{ oracle_group }}"
+    owner: "{{ oracle_user }}"
+    path: "{{ oracle_tmp }}"
+    state: directory
+    recurse: yes
+
+# - name: host checklist Start  for Grid Install
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       host_name: "{{ ansible_hostname }}"
+#       ticket_ref: "{{ ticket_ref }}"
+#       checklist_type: 'ACFS Config'
+#       checklist_category: 'Install'
+#       gi_install_status: 'IN_PROGRESS'
+#       task_desc: 'check currently mounted ASM DGs'
+#   tags:
+#   - apex_api
+
+
+- name: db checklist status post for OJVM PATCHING
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "ACFS Config"
+    task_id: "{{ ticket_ref }}"
+    task_status: "IN_PROGRESS"
+    task_message: "check currently mounted ASM DGs on {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- name: check currently mounted ASM DGs
+  become: yes
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  command: asmcmd lsdg --suppressheader
+  register: asm_disks_list
+  changed_when: False
+- set_fact:
+    asm_disks: "{{ asm_disks | default('') + '\n' + asm_line | regex_search('MOUNTED.*') }}'"
+  loop: "{{ asm_disks_list.stdout_lines }}"
+  loop_control:
+    loop_var: asm_line
+
+# - name: host checklist Start  for Grid Install
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       host_name: "{{ ansible_hostname }}"
+#       ticket_ref: "{{ ticket_ref }}"
+#       checklist_type: 'ACFS Config'
+#       checklist_category: 'Install'
+#       gi_install_status: 'IN_PROGRESS'
+#       task_desc: 'Configuring ACFS for EXP'
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for OJVM PATCHING
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "ACFS Config"
+    task_id: "{{ ticket_ref }}"
+    task_status: "IN_PROGRESS"
+    task_message: "Configuring ACFS for EXP {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+
+- include_tasks: configure_acfs.yml
+  vars:
+    diskgroup: "{{ exp_dg }}"
+  when:
+  - create_exp_diskgroup
+  - oracle_base + '/' + exp_dg.dir not in ansible_mounts | json_query('[].mount')
+
+# - name: host checklist Start  for Grid Install
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: 'ACFS Config'
+#       ticket_ref: "{{ ticket_ref }}"
+#       checklist_category: 'Install'
+#       gi_install_status: 'IN_PROGRESS'
+#       task_desc: 'Configuring ACFS for GG'
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for OJVM PATCHING
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "ACFS Config"
+    task_id: "{{ ticket_ref }}"
+    task_status: "IN_PROGRESS"
+    task_message: "Configuring ACFS for GG {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- include_tasks: configure_acfs.yml
+  vars:
+    diskgroup: "{{ gg_dg }}"
+  when:
+  - create_gg_diskgroup
+  - oracle_base + '/' + gg_dg.dir not in ansible_mounts | json_query('[].mount')
+
+# - name: host checklist Start  for Grid Install
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       checklist_type: 'ACFS Config'
+#       host_name: "{{ ansible_hostname }}"
+#       ticket_ref: "{{ ticket_ref }}"
+#       checklist_category: 'Install'
+#       gi_install_status: 'COMPLETED'
+#       task_desc: 'Configuring ACFS for GG'
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for OJVM PATCHING
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "ACFS Config"
+    task_id: "{{ ticket_ref }}"
+    task_status: "COMPLETED"
+    task_message: "Configuring ACFS for GG {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api

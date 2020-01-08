@@ -1,0 +1,58 @@
+---
+- name: read remote feature file
+  slurp:
+    src: "{{ features_destination }}_feature_stats.json"
+  register: feature_stats_raw
+
+- name: read remote product file
+  slurp:
+    src: "{{ features_destination }}_product_stats.json"
+  register: product_stats_raw
+
+
+- name: Read File and save as Var
+  set_fact:
+    features_json: "{{ feature_stats_raw['content'] | b64decode | from_json }}"
+    products_json: "{{ product_stats_raw['content'] | b64decode | from_json }}"
+
+
+- name: POST Features to APEX
+  uri:
+    url:  "{{ apex_url }}/charter/send_process_status"
+    validate_certs: no  # TODO: should be removed after https certs becomes renewed
+    method: POST
+    body_format: json
+    body: "{{ products_json }}"
+    headers:
+      Content-Type: "application/json"
+      task_id: "{{ ticket_ref }}"
+      task_key: "{{ ansible_hostname }}"
+      task_area: "Gather License Info"
+      task_status: "SUCCESS"
+      task_message: "Uploaded Feature Data"
+      record_type: "LOAD_JSON"
+  register: features_post_response
+
+- name: POST Products to APEX
+  uri:
+    url: "{{ apex_url }}/charter/send_process_status"
+    validate_certs: no  # TODO: should be removed after https certs becomes renewed
+    method: POST
+    body_format: json
+    body: "{{ features_json }}"
+    headers:
+      Content-Type: "application/json"
+      task_id: "{{ ticket_ref }}"
+      task_key: "{{ ansible_hostname }}"
+      task_area: "Gather License Info"
+      task_status: "SUCCESS"
+      task_message: "Uploaded Product Data"
+      record_type: "LOAD_JSON"
+  register: products_post_response
+
+
+- debug:
+    msg: "{{ products_post_response }}"
+
+- debug:
+    msg: "{{ features_post_response }}"

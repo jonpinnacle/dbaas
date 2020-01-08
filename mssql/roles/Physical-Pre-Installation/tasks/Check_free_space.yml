@@ -1,0 +1,12 @@
+---
+- debug:
+    var: drive
+
+- name: check free space
+  set_fact: 
+    free_space: "{{ ansible_facts | json_query('disks[?partitions[?drive_letter==' + drive.letter + ']].partitions[1].volumes[0].size_remaining') | first }}"
+
+- name: "{{ drive.letter }} drive has {{ free_space | filesizeformat }} free"
+  fail:
+    msg: Not enough free space! There should be at least {{ drive.min_size | filesizeformat }} free
+  when: free_space < drive.min_size

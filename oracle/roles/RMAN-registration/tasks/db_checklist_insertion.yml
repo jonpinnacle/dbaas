@@ -1,0 +1,22 @@
+---
+
+- include_tasks: get_db_id.yml
+  when: db_id is not defined
+
+- name: POST To Insert new Checklist entry
+  uri:
+    url: "{{ apex_url }}/charter/insert_db_check_list"
+    validate_certs: no  # should be removed after https certs becomes renewed
+    method: POST
+    body_format: json
+    body:
+        db_name: "{{ db_name }}"
+    status_code: 200,201
+    headers:
+      Content-Type: "application/json"
+  ignore_errors: yes
+  register: checklist_insrt_response
+  
+- name: set checklist_id
+  set_fact:
+   checklist_id: "{{ checklist_insrt_response.json.ID }}"

@@ -1,0 +1,13 @@
+---
+- name: install pip
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  tasks:
+  - name: test 1
+    pip:
+      name: psutil
+  - name: test
+    pip:
+      name: pywinrm
+      version: 0.3.0

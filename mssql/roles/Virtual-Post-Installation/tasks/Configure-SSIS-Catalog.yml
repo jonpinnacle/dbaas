@@ -1,0 +1,31 @@
+---
+- name: Configure SSIS Catalog
+  win_shell: |
+    # Load the IntegrationServices Assembly
+    [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.IntegrationServices") | Out-Null
+    # Store the IntegrationServices Assembly namespace to avoid typing it every time
+    $ISNamespace = "Microsoft.SqlServer.Management.IntegrationServices"
+
+    # Create a connection to the server
+    $sqlConnectionString = "Data Source={{ ansible_hostname }};Initial Catalog=master;Integrated Security=SSPI;"
+    $sqlConnection = New-Object System.Data.SqlClient.SqlConnection $sqlConnectionString
+
+    # Create the Integration Services object
+    $integrationServices = New-Object $ISNamespace".IntegrationServices" $sqlConnection
+    #
+    Invoke-SqlCmd -QueryTimeout 0 -query "EXEC sp_configure 'clr enabled' , '1'"
+    Invoke-SqlCmd -QueryTimeout 0 -query "RECONFIGURE"
+    # Provision a new SSIS Catalog
+    $catalog = New-Object $ISNamespace".Catalog" ($integrationServices, "SSISDB", "{{ SaPw }}")
+    $catalog.Create()
+
+    $Qry = "EXEC [SSISDB].sys.sp_addextendedproperty @name=N'App Owner', @value=N'DC - SQL Database' EXEC [SSISDB].sys.sp_addextendedproperty @name=N'Application', @value=N'SSIS Catalog Database' EXEC [SSISDB].sys.sp_addextendedproperty @name=N'Primary Technical Contact (PTC)', @value=N'Stevenson, William' EXEC [SSISDB].sys.sp_addextendedproperty @name=N'PTC Email', @value=N'William.Stevenson@charter.com' EXEC [SSISDB].sys.sp_addextendedproperty @name=N'Secondary Technical Contact (STC)', @value=N'Aluri, Sahithi' EXEC [SSISDB].sys.sp_addextendedproperty @name=N'STC Email', @value=N'Sahithi.Aluri@charter.com' EXEC [SSISDB].sys.sp_addextendedproperty @name=N'Application Distribution List', @value=N'DLCorpIT-SQLServerAdmins@charter.com'"
+
+    Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+  ignore_errors: yes # if already updated
+  no_log: true
+  register: config_ssis
+
+- name: Protected Output - Configure SSIS Catalog                                       
+  debug:                                                                  
+    var: "config_ssis | combine({'cmd': config_ssis.cmd | replace(SaPw, '<PASSWORD HIDDEN>')})"

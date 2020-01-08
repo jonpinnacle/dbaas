@@ -1,0 +1,12 @@
+---
+# defaults file for aws_vms
+aws_template: lt-0f76a4b651ec0165a
+aws_keys: gf_lab
+aws_instance_type: t2.medium
+aws_region: us-east-2
+aws_ami: ami-476e4c22
+aws_security_group:      
+  - sg-01122dcc44993b4e8
+  - sg-0cad5807e6eb827f0
+aws_subnet_ids: subnet-0e0e440d3239d85c7
+platform_vendor: DEFAULT

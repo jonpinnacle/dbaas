@@ -1,0 +1,11 @@
+---
+standard_task_id: "123"
+json_backup_dir: /tmp
+apex_uri: "dbaas_api"
+
+os_platform: ""
+platform_vendor: ""
+catalog_dest: ""
+checklist_body: ""
+db_features_body: ""
+ansible_name: "{{ inventory_hostname }}"

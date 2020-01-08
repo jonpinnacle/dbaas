@@ -1,0 +1,215 @@
+$TempFiles = {{ Allcores }}
+If ($TempFiles -gt 8) { $TempFiles = "8" }
+
+$cn = New-Object System.Data.SqlClient.SqlConnection
+$cn.ConnectionString = "Data Source={{ ansible_hostname }}; User ID=sa; Password={{ SaPw }}; Initial Catalog=master"
+$cn.Open()
+# Fetch Server list into the Data source from Srv.ServerList Table from CentralDB
+$ds = New-Object "System.Data.DataSet" "dspw"
+$q = "SELECT COUNT(*) AS 'Count' FROM tempdb.dbo.sysfiles WHERE groupid <> 0;"
+$da = New-Object "System.Data.SqlClient.SqlDataAdapter" ($q, $cn)
+$da.Fill($ds)
+$cn.Close()
+
+$dtServerList = $ds.Tables[0]
+$CurFiles = $dtServerList | Select Count
+$NumFiles = $CurFiles.Count
+
+$Size = gwmi win32_volume | where-object { $_.name -eq "{{ TempdbPath }}\" } | Select capacity
+$DSize = [System.Math]::Round(($Size.capacity/1024/1024) * .82, 0)
+
+Write-host "# of cpu cores" -foregroundcolor "Cyan"
+$TempFiles
+Write-host "# of tempdb files" -foregroundcolor "Cyan"
+$NumFiles
+
+If ("{{ SqlVersion }}" -eq "2016")
+{
+	If ($Numfiles -lt $TempFiles)
+	{
+		$NumFiles = $TempFiles - $CurFiles.count
+		$FSize = [System.Math]::Round($DSize/$Tempfiles, 0) ##Was Numfiles
+		$FSize = [String]$FSize + "MB"
+		
+		If ($NumFiles -eq 1)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'temp2', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0)   
+				ALTER DATABASE [tempdb] MODIFY FILE (NAME=N'temp2', NEWNAME=N'tempdev2', FILENAME=N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf')"
+			
+		}
+		
+		If ($NumFiles -eq 2)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'temp2', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0)   
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] MODIFY FILE (NAME=N'temp2', NEWNAME=N'tempdev2', FILENAME=N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf')"
+		}
+		
+		If ($NumFiles -eq 3)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'temp2', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0)   
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev5', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data5.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] MODIFY FILE (NAME=N'temp2', NEWNAME=N'tempdev2', FILENAME=N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf')"
+		}
+		
+		If ($NumFiles -eq 4)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'temp2', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0)   
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev5', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data5.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev6', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data6.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] MODIFY FILE (NAME=N'temp2', NEWNAME=N'tempdev2', FILENAME=N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf')"
+		}
+		
+		If ($NumFiles -eq 5)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'temp2', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0)   
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev5', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data5.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev6', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data6.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev7', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data7.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] MODIFY FILE (NAME=N'temp2', NEWNAME=N'tempdev2', FILENAME=N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf')"
+		}
+		
+		If ($NumFiles -eq 6)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'temp2', SIZE = $FSize , FILEGROWTH = 0)
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0)   
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev5', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data5.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev6', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data6.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev7', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data7.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev8', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data8.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+				ALTER DATABASE [tempdb] MODIFY FILE (NAME=N'temp2', NEWNAME=N'tempdev2', FILENAME=N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf')"
+		}
+		
+		Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+	}
+	
+	
+	If ($Numfiles -ge $TempFiles)
+	{
+		$FSize = [System.Math]::Round($DSize/$NumFiles, 0)
+		$FSize = [String]$FSize + "MB"
+		
+		$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+			ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'temp2', SIZE = $FSize , FILEGROWTH = 0)
+			ALTER DATABASE [tempdb] MODIFY FILE (NAME=N'temp2', NEWNAME=N'tempdev2', FILENAME=N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf')"
+		
+		Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+	}
+}
+Else
+{
+	If ($Numfiles -lt $TempFiles)
+	{
+		$NumFiles = $TempFiles - $CurFiles.count
+		$FSize = [System.Math]::Round($DSize/$Tempfiles, 0) ##Was Numfiles
+		$FSize = [String]$FSize + "MB"
+		
+		If ($NumFiles -eq 1)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev2', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf' , SIZE = $FSize , FILEGROWTH = 0)"
+		}
+		
+		If ($NumFiles -eq 2)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev2', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0)"
+		}
+		
+		If ($NumFiles -eq 3)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev2', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0)"
+		}
+		
+		If ($NumFiles -eq 4)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev2', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev5', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data5.ndf' , SIZE = $FSize , FILEGROWTH = 0)"
+		}
+		
+		If ($NumFiles -eq 5)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev2', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev5', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data5.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev6', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data6.ndf' , SIZE = $FSize , FILEGROWTH = 0)"
+		}
+		
+		If ($NumFiles -eq 6)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev2', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev5', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data5.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev6', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data6.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev7', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data7.ndf' , SIZE = $FSize , FILEGROWTH = 0)"
+		}
+		
+		If ($NumFiles -eq 7)
+		{
+			
+			$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev2', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data2.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev3', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data3.ndf' , SIZE = $FSize , FILEGROWTH = 0) 
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev4', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data4.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev5', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data5.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev6', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data6.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev7', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data7.ndf' , SIZE = $FSize , FILEGROWTH = 0)
+                ALTER DATABASE [tempdb] ADD FILE ( NAME = N'tempdev8', FILENAME = N'{{ TempdbPath }}MSSQL\Data\tempdb_Data8.ndf' , SIZE = $FSize , FILEGROWTH = 0)"
+		}
+		
+		Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+	}
+	
+	
+	If ($Numfiles -ge $TempFiles)
+	{
+		$FSize = [System.Math]::Round($DSize/$NumFiles, 0)
+		$FSize = [String]$FSize + "MB"
+		
+		$Qry = "ALTER DATABASE [tempdb] MODIFY FILE ( NAME = N'tempdev', SIZE = $FSize , FILEGROWTH = 0)"
+		
+		Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master" -username "sa" -password {{ SaPw }}
+	}
+	
+}
+
+Write-host "Query:" -foregroundcolor "Cyan"
+$Qry

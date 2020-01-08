@@ -1,0 +1,40 @@
+---
+- name: read logfile
+  slurp:
+    src: "{{ logfile_path }}"
+  register: logfile_text
+
+- name: Insert Log FIle to V_CHECKLIST_STATUS
+  block:
+  #  "app_id" is a fk and needs to discussed and is not in body of post call
+  - name: POST In features V_PROCESS_STATUS
+    uri:
+      url: "{{ apex_url }}/{{ apex_uri }}/checklist/checklist_attach_file"
+      validate_certs: no  # should be removed after https certs becomes renewed
+      method: POST
+      body_format: json
+      body:  "{{ logfile_text.content | b64decode | string }}"
+      headers:
+        Content-Type: "application/json"
+        Cache-Control: "no-cache"
+        record_type: "{{ record_type }}"
+        task_area: "{{ task_area }}"
+        task_id: "{{ task_id }}"
+        task_key: "{{ task_key }}"
+        task_status: "{{ task_status }}"
+        file_name: "{{ logfile_path }}"
+        file_mimetype: "text/plain"
+        task_message: "{{ task_message }}"
+        platform_vendor: "{{ platform_vendor }}"
+        standard_task_id: "{{ standard_task_id }}"
+    register: checklist_attach_file_response
+  rescue:
+  - name: Store the Json If APEX Server Is Down
+    delegate_to: localhost
+    become: False
+    lineinfile:
+      path: "{{ json_backup_dir }}/{{ ansible_name }}_db_features.json"
+      line: "{{ db_features_body  | to_json }}"
+      create: yes
+    when:
+    - checklist_attach_file_response == "500" or  checklist_attach_file_response.status == -1

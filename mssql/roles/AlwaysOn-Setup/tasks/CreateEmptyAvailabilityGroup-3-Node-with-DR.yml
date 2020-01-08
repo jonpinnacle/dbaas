@@ -1,0 +1,101 @@
+---
+- name: Copy CreateEmptyAvailabilityGroup-3-Node file
+  win_template:
+    src: CEAG-3-Node/{{ item.file }}.j2
+    dest: c:\Ansible\Temp\{{ item.file }}.sql
+  when: (ansible_hostname | lower ) == ( item.Replica | lower )
+  with_items:
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-3-Node-01P }
+      - { Replica: '{{ SecondaryReplica }}', file: CEAG-3-Node-02S }
+      - { Replica: '{{ DrReplica }}', file: CEAG-3-Node-03D }
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-3-Node-04P }
+      - { Replica: '{{ SecondaryReplica }}', file: CEAG-3-Node-05S }
+      - { Replica: '{{ DrReplica }}', file: CEAG-3-Node-06D }
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-3-Node-07P }
+      - { Replica: '{{ SecondaryReplica }}', file: CEAG-3-Node-08S }
+      - { Replica: '{{ DrReplica }}', file: CEAG-3-Node-09D }
+      - { Replica: '{{ PrimaryReplica }}', file: CEAG-3-Node-10P }
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for PrimaryReplica on CEAG-3-Node-01P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-01P.sql > c:\Ansible\Logs\CEAG-3-Node-01P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for SecondaryReplica on CEAG-3-Node-02S
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-02S.sql > c:\Ansible\Logs\CEAG-3-Node-02S.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( SecondaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for DrReplica on CEAG-3-Node-03D
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-03D.sql > c:\Ansible\Logs\CEAG-3-Node-03D.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( DrReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for PrimaryReplica on CEAG-3-Node-04P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-04P.sql > c:\Ansible\Logs\CEAG-3-Node-04P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica| lower )
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for SecondaryReplica on CEAG-3-Node-05S
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-05S.sql > c:\Ansible\Logs\CEAG-3-Node-05S.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( SecondaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for DrReplica on CEAG-3-Node-06D
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-06D.sql > c:\Ansible\Logs\CEAG-3-Node-06D.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( DrReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for PrimaryReplica on CEAG-3-Node-07P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-07P.sql > c:\Ansible\Logs\CEAG-3-Node-07P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for SecondaryReplica on CEAG-3-Node-08S
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-08S.sql > c:\Ansible\Logs\CEAG-3-Node-08S.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( SecondaryReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for DrReplica on CEAG-3-Node-09D
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-09D.sql > c:\Ansible\Logs\CEAG-3-Node-09D.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( DrReplica | lower )
+
+- name: Run CreateEmptyAvailabilityGroup-3-Node for PrimaryReplica on CEAG-3-Node-10P
+  win_shell:
+    sqlcmd -i c:\Ansible\Temp\CEAG-3-Node-10P.sql > c:\Ansible\Logs\CEAG-3-Node-10P.log
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout or checklog.stderr != "" '
+  when: (ansible_hostname | lower ) == ( PrimaryReplica | lower )
+
+# - name: CreateEmptyAvailabilityGroup-3-Node
+#   win_template:
+#     src: ../templates/CreateEmptyAvailabilityGroup-3-Node.j2
+#     dest: c:\Ansible\Temp\CreateEmptyAvailabilityGroup-3-Node.sql
+
+
+# - name: CreateEmptyAvailabilityGroup-2-Node
+#   win_shell:
+#     sqlcmd  -i c:\Ansible\Temp\CreateEmptyAvailabilityGroup-3-Node.sql > C:\Ansible\Logs\CreateEmptyAvailabilityGroup-3-Node.log
+
+# - name: Read the logfile
+#   win_shell:
+#     gc C:\Ansible\Logs\CreateEmptyAvailabilityGroup-3-Node.log

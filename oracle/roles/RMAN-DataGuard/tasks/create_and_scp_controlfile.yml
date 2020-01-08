@@ -1,0 +1,34 @@
+---
+- name: Create controlfile
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  block:
+  - name: Copy the standby_controlfile.sql file
+    template: 
+      src: standby_controlfile.j2
+      dest: "{{ oracle_tmp }}/standby_controlfile.sql"
+
+  - name: Create controlfile by sqlplus
+    command: "sqlplus / as sysdba @{{ oracle_tmp }}/standby_controlfile.sql"
+    register: opt1
+    failed_when: '"ERROR" in opt1.stdout'
+  when: inventory_hostname == master_node
+
+- name: Copy controlfile to local
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  fetch:
+    src: '{{ oracle_tmp }}/db_stby.ctl'
+    dest: .
+  when: inventory_hostname == master_node
+
+- name: Copy controlfile from local to target
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  copy:
+    src: './{{ ansible_play_hosts[0] }}/{{ oracle_tmp }}/db_stby.ctl'
+    dest: '{{ oracle_tmp }}/db_stby.ctl'
+  when: inventory_hostname != master_node

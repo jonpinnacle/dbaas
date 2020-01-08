@@ -1,0 +1,160 @@
+---
+# tasks file for mssql_aws
+- include_vars: secret.yml
+  no_log: True
+  run_once: true
+
+- name: get a list of inventory
+  uri:
+    url: "{{ awx_api_uri }}inventories/?name={{ awx_inventory }}"
+    method: GET
+    user: "{{ awx_api_user }}"
+    password: "{{ awx_api_passwd }}"
+    force_basic_auth: yes
+    status_code: 200
+  register: inventories
+
+- name: set the our inventory id number as fact
+  set_fact:
+    inventory_id: "{{ inventories | json_query(id_query) | replace('[', '') | replace(']', '') }}"
+  vars:
+    id_query: "json.results[?name == `{{ awx_inventory }}`].id"
+
+- name: get host from the inventory
+  uri:
+    url: "{{ awx_api_uri }}inventories/{{ inventory_id }}/hosts/?name={{ inventory_hostname }}"
+    method: GET
+    user: "{{ awx_api_user }}"
+    password: "{{ awx_api_passwd }}"
+    force_basic_auth: yes
+    status_code: 200
+  register: invout
+
+- name: set the id number of the host as fact
+  set_fact:
+    inventory_host: "{{ invout | json_query(host_query) | replace('[', '') | replace(']', '') }}"
+  vars:
+    host_query: "json.results[?name == `{{ inventory_hostname }}`].id"
+
+- name: set the variables of the host as fact
+  set_fact:
+    inventory_host_vars: "{{ invout | json_query(host_query) | replace('[', '') | replace(']', '') | replace('\"', '') | replace('u---', '---') }}"
+  vars:
+    host_query: "json.results[?name == `{{ inventory_hostname }}`].variables"
+
+- name: find current Windows AMI in this region
+  ec2_ami_find:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    region: "{{ target_aws_region }}"
+    platform: windows
+    virtualization_type: hvm
+    owner: amazon
+    name: Windows_Server-2016-English-Full-Base-*
+    no_result_action: fail
+    sort: name
+    sort_order: descending
+  register: found_amis
+  run_once: true
+
+- set_fact:
+    win_ami_id: "{{ (found_amis.results | first).ami_id  }}"
+  run_once: true
+
+- name: ensure instances are running
+  ec2:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    region: "{{ target_aws_region }}"
+    image: "{{ win_ami_id }}"
+    instance_type: t2.large
+    group_id: [ "sg-01122dcc44993b4e8", "sg-0cad5807e6eb827f0" ]
+    wait: yes
+    wait_timeout: 500
+    exact_count: 1
+    count_tag:
+      Name: "{{ inventory_hostname }}-1"
+    instance_tags:
+      Name: "{{ inventory_hostname }}"
+    user_data: "{{ lookup('template', 'userdata.txt.j2') }}"
+    vpc_subnet_id: subnet-0e0e440d3239d85c7
+    volumes:
+      - device_name: /dev/xvdb
+        volume_type: gp2
+        volume_size: 100
+      - device_name: /dev/xvdc
+        volume_type: gp2
+        volume_size: 30
+      - device_name: /dev/xvdd
+        volume_type: gp2
+        volume_size: 30
+      - device_name: /dev/xvde
+        volume_type: gp2
+        volume_size: 30
+      - device_name: /dev/xvdf
+        volume_type: gp2
+        volume_size: 30
+      - device_name: /dev/xvdg
+        volume_type: gp2
+        volume_size: 30
+  register: ec2_resultsql
+  when: win_role == 'mssql'
+
+- name: ensure instances are running
+  ec2:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    region: "{{ target_aws_region }}"
+    image: "{{ win_ami_id }}"
+    instance_type: t2.large
+    group_id: [ "sg-01122dcc44993b4e8", "sg-0cad5807e6eb827f0" ]
+    wait: yes
+    wait_timeout: 500
+    exact_count: 1
+    count_tag:
+      Name: "{{ inventory_hostname }}-1"
+    instance_tags:
+      Name: "{{ inventory_hostname }}"
+    user_data: "{{ lookup('template', 'userdata.txt.j2') }}"
+    vpc_subnet_id: subnet-0e0e440d3239d85c7
+  register: ec2_result
+  when: win_role != 'mssql'
+
+- name: update the host in the inventory
+  uri:
+    url: "{{ awx_api_uri }}hosts/{{ inventory_host }}/"
+    method: PATCH 
+    user: "{{ awx_api_user }}"
+    password: "{{ awx_api_passwd }}"
+    body: >
+      {
+      "variables": "{{ inventory_host_vars }}\nansible_host: {{ ec2_resultsql.instances[0].public_ip }}"
+      }
+    headers:
+      Content-Type: "application/json"
+    force_basic_auth: yes
+    status_code: 200
+    body_format: json
+  when: win_role == 'mssql'
+
+- name: update the host in the inventory
+  uri:
+    url: "{{ awx_api_uri }}hosts/{{ inventory_host }}/"
+    method: PATCH
+    user: "{{ awx_api_user }}"
+    password: "{{ awx_api_passwd }}"
+    body: >
+      {
+      "variables": "{{ inventory_host_vars }}\nansible_host: {{ ec2_result.instances[0].public_ip }}"
+      }
+    headers:
+      Content-Type: "application/json"
+    force_basic_auth: yes
+    status_code: 200
+    body_format: json
+  when: win_role != 'mssql'
+
+- name: let processes settle
+  pause:
+    minutes: 5
+  run_once: true

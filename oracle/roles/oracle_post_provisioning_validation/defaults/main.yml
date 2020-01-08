@@ -1,0 +1,50 @@
+---
+
+oracle_tmp: /u01/tmp/postval
+ticket_ref: "45678"
+golden_gate_check: False
+apex_url: "https://apex-dev.techlab.com:8443/ords/invent2"
+oracle_user: oracle
+grid_version: 12.1.0.2
+install_base: /u01/app
+oracle_version: 12.1.0.2
+oracle_db_home: db_1
+oracle_db_name: orcl
+
+oracle_database_home: "{{ install_base }}/oracle/product/{{ oracle_version }}/{{ oracle_db_home }}"
+
+grid_home: "{{ oracle_base }}/{{ grid_version }}/grid_1"
+
+oracle_base: "{{ install_base }}/oracle"
+oracle_group: oinstall
+sql_file_path: "{{ oracle_tmp }}"
+
+standard_task_id: "0"
+
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ oracle_db_name }}"
+  ORACLE_HOME: "{{ oracle_database_home }}"
+  ORACLE_UNQNAME: "{{ oracle_db_name | default('') }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ oracle_database_home }}/bin:{{ ansible_env.PATH }}"
+  TMP: "/u01/app/oracle"
+  TMPDIR: "/u01/app/oracle"
+  GRID_HOME: "/u01/app/12.1.0.2/grid"
+
+sql_files:
+  - verify_dba_directories.sql
+  - verify_tablespace.sql
+  - verify_alter_profile.sql
+  - verify_block_tracking.sql
+  - verify_created_profile.sql
+  - verify_db_files.sql
+  - verify_parallel_force.sql
+  - verify_recyclebin_status.sql
+  - verify_snapshot_interval.sql
+  - verify_redo_logs.sql
+  - post_check_audit_purge.sql
+  - Password_Verification_function.sql
+  - archive_log_mode.sql
+  - verify_database_service.sql
+  - verify_memory_values.sql

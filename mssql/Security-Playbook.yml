@@ -1,0 +1,5 @@
+- name: Security-Playbook
+#  hosts: Physical-Windows
+  hosts: '{{ host }}'
+  roles:
+     - Security-Playbook

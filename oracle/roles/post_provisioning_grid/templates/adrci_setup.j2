@@ -1,0 +1,7 @@
+{%- for adrci_home in adrci_homes.stdout_lines -%}
+{% if adrci_home != "ADR Homes: " %}
+SET HOMEPATH {{ adrci_home }};
+SET CONTROL (SHORTP_POLICY=168);
+SET CONTROL (LONGP_POLICY=744);
+{% endif %}
+{%- endfor -%}

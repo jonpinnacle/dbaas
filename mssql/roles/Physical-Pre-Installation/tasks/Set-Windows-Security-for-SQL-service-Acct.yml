@@ -1,0 +1,51 @@
+---
+- name: Add the member to local Group
+  win_group_membership:
+    name: Administrators
+    members:
+      - '{{ UName }}'
+    state: present
+    
+- name: Add the TWCDMZ member to local Group
+  win_group_membership:
+    name: Administrators
+    members:
+      - "{{ twcdmzuser }}"
+    state: present
+  when: Domain == "TWCDMZ"
+  loop:
+  - twcdmz\gg-sitescope-admins
+  - twcdmz\GG-OpenView-Server Admin
+  loop_control:
+    loop_var: twcdmzuser
+    
+- name: Add the TWCCORP member to local Group
+  win_group_membership:
+    name: Administrators
+    members:
+      - "{{ twccorpuser }}"
+    state: present
+  when: Domain == "TWCCORP"
+  loop:
+  - twccorp\GG-css-tsg-sim
+  - twccorp\gg-ovow administrators
+  - twccorp\GG-OpenView-Server Admin
+  - CHTR\EG-SQLAdmins
+  - CHTR\svc_sqlmail
+  loop_control:
+    loop_var: twccorpuser
+
+- name: Modify rights of user
+  win_user_right: 
+   name: "{{ rights }}"
+   users: "{{ UName }}"
+   action: add
+  loop:
+  - SeLockMemoryPrivilege
+  - SeManageVolumePrivilege
+  - SeServiceLogonRight
+  - SeAssignPrimaryTokenPrivilege
+  - SeIncreaseQuotaPrivilege
+  - SeImpersonatePrivilege
+  loop_control:
+      loop_var: rights

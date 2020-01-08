@@ -1,0 +1,30 @@
+- name: install mssql physical machine
+#  hosts: Physical-Windows
+  hosts: '{{ host }}'
+  tasks:
+    - name: Physical-Pre-Installation
+      import_role:
+        name: Physical-Pre-Installation
+        tasks_from: main.yml
+
+    - name: Physical-Installation
+      import_role:
+        name: Physical-Installation
+        tasks_from: main.yml
+    
+    - name: Pause
+      pause: minutes=1
+
+    - name: Physical-Post-Installation
+      import_role:
+        name: Physical-Post-Installation
+        tasks_from: main.yml
+      
+  
+  
+
+
+    
+
+
+  

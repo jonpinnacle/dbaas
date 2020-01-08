@@ -1,0 +1,15 @@
+---
+- name: Insert a row in the ServerList Table file
+  win_shell: |
+   $Date = Get-Date -Format g
+   $Date
+   $Qry = "IF NOT EXISTS (SELECT TOP 1 1 FROM [CHARTER_DBA].[SVR].[SERVERLIST] WHERE SERVERNAME = '{{ ansible_hostname }}' AND INSTANCENAME = '{{ ansible_hostname }}') INSERT INTO [CHARTER_DBA].[SVR].[ServerList] ([ServerName],[InstanceName],[Environment],[DateAdded],[Active]) VALUES('{{ ansible_hostname }}','{{ ansible_hostname }}','{{ Env1 }}', '$Date' ,'Y') IF EXISTS (SELECT TOP 1 1 FROM [CHARTER_DBA].[SVR].[SERVERLIST] WHERE SERVERNAME = '{{ ansible_hostname }}' AND INSTANCENAME = '{{ ansible_hostname }}' AND ACTIVE = 'N') UPDATE [CHARTER_DBA].[SVR].[ServerList] SET [Environment] = '{{ Env1 }}',[DateAdded] = '$Date' ,[Active]='Y' WHERE  SERVERNAME = '{{ ansible_hostname }}' AND INSTANCENAME = '{{ ansible_hostname }}' AND ACTIVE = 'N'"
+   Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username "{{ username }}" -password "{{ password }}"
+  no_log: True
+  failed_when: false
+  register: serverlist_row_insert
+
+- name: Protected Output - Insert a row in the ServerList Table file                                       
+  debug:                                                                  
+    var: "serverlist_row_insert | combine({'cmd': serverlist_row_insert.cmd | replace(password, '<PASSWORD HIDDEN>')})"
+  failed_when: serverlist_row_insert.rc

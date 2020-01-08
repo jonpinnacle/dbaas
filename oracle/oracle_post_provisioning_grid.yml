@@ -1,0 +1,9 @@
+---
+
+- name: Post Provisioning for Grid Infrastructure
+  hosts: '{{ host }}'
+  become: yes
+  tasks:
+  - import_role:
+      name: post_provisioning_grid
+

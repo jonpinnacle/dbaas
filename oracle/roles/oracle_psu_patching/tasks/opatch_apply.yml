@@ -1,0 +1,108 @@
+---
+- name: Get running processes
+  shell: "ps -ef| grep -v grep| grep -w asmcmd| grep -w daemon| awk '{print $2}'"
+  register: running_ASM_processes
+
+- name: Kill asm Running Processes
+  shell: 'kill -9 {{ item }}'
+  with_items: "{{running_ASM_processes.stdout_lines }}"
+
+# - wait_for:
+#   path: "/proc/{{ item }}/status"
+#   state: absent
+#   with_items: "{{running_ASM_processes.stdout_lines }}"
+#   ignore_errors: yes
+#   register: killed_processes
+
+- name: host checklist post for Patching
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_patch_checklist_update.yml
+  vars:
+    chklst_json_body:
+      db_home: "{{ oracle_db_home }}"
+      host_name: "{{ ansible_hostname }}"
+      PSU_NUMBER: "{{ patch_num }}"
+      PSU_QUARTER: "{{ patch_quarter }}"
+      PSU_YEAR: "{{ patch_year }}"
+      patch_type: "{{ patch_type }}"
+      patch_status: 'RUNNING OPATCH APPLY'
+      new_entry: True
+  tags:
+  - apex_api
+
+- name: create old logs folder
+  file:
+    path: "{{ oracle_home }}/cfgtoollogs/opatch/oldlogs"
+    state: directory
+
+- name: get opatch logfile
+  find:
+    paths: "{{ oracle_home }}/cfgtoollogs/opatch"
+    file_type: file
+    patterns: '*.log'
+  register: opatch_log
+
+
+# - name: move log files to old logs folder
+#   command: mv {{ item.path }} {{ oracle_home }}/oldlogs
+#   with_items: "{{ opatch_log.files }}"
+
+- name: Run Opatch
+  environment: "{{ ora_user_env }}"
+  command: opatchauto apply {{ pstage }}/{{ patch_num }} {{ opatch_flags }} -oh {{ oracle_home }}
+  register: opatch_apply
+
+- name: save opatch apply stdout
+  copy:
+    dest: "{{ oracle_tmp }}/opatch_apply.out"
+    content: "{{ opatch_apply.stdout }}"
+  changed_when: False
+
+- name: save opatch prereq stderr
+  copy:
+    dest: "{{ oracle_tmp }}/opatch_apply.err"
+    content: "{{ opatch_apply.stderr }}"
+  changed_when: False
+  when: opatch_apply.stderr_lines | length > 0
+
+- name: get new opatch logfile
+  find:
+    paths: "{{ oracle_home }}/cfgtoollogs/opatch"
+    file_type: file
+    patterns: '*.log'
+  register: new_opatch_log
+
+- name: Get latest log file
+  set_fact:
+    latest_file: "{{ new_opatch_log.files | sort(attribute='mtime',reverse=true) | first }}"
+
+- name: db checklist status file upload for PSU Patch Log
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status_file.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "PSU BUNDLE PATCHING"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload Patch Log"
+    task_message: "Patch Log for  {{ ansible_hostname }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    logfile_path:   "{{ new_opatch_log.files[0].path }}"
+    standard_task_id: "{{ standard_task_id }}"
+  when:
+    - fresh_install
+    - new_opatch_log.files[0] is defined
+  tags:
+  - apex_api
+
+- name: host checklist post for Patching
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_patch_upload_log.yml
+  vars:
+    logfile_path: "{{ new_opatch_log.files[0].path }}"
+  when:  new_opatch_log.files[0] is defined
+  tags:
+  - apex_api

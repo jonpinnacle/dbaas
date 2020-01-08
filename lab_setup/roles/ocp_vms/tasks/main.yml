@@ -1,0 +1,63 @@
+---
+# tasks file for ocp_vms
+- import_tasks: molecule.yml
+  tags: [ 'never', 'molecule' ]
+
+- name: include variables
+  include_vars: secrets.yml
+  no_log: True
+
+- name: create key for instance deployment
+  template: 
+    src: templates/oci_api_key.pem.j2
+    dest: "{{ playbook_dir }}/roles/{{ role_name }}/files/oci_api_key.pem"
+  run_once: True
+
+#- name: install oci-module
+#  pip:
+#    name: oci
+#  become: True
+#  delegate_to: localhost
+#  run_once: True
+
+#- name: install oci-ansible-modules
+#  command: python {{ playbook_dir }}/roles/{{ role_name }}/files/oci-ansible-modules/install.py
+#  args:
+#    creates: "{{ lookup('env','HOME') }}/.oci-ansible-modules"
+#  register: oci_ansible_modules
+#  become: True
+#  delegate_to: localhost
+#  run_once: True
+
+- name: Create oci directory
+  file:
+    path: "{{ lookup('env','HOME') }}/.oci"
+    state: directory
+    recurse: yes
+  run_once: True
+
+- name: ensure oci config exists
+  copy:
+    content: ""
+    dest: "{{ lookup('env','HOME') }}/.oci/config"
+    force: no
+  run_once: True
+
+#- name: ensure file exists
+#  copy:
+#    content: ""
+#    dest: "{{ lookup('env','HOME') }}/.oci-ansible-modules"
+#    force: no
+#  run_once: True
+#  when: oci_ansible_modules is succeeded
+
+- include_tasks: oracle.yml
+  when: platform_vendor == "ORACLE"
+
+- include_tasks: mongodb.yml
+  when: platform_vendor == "MONGODB"
+
+- include_tasks: common.yml
+  when:
+    - platform_vendor != "ORACLE"
+    - platform_vendor != "MONGODB"

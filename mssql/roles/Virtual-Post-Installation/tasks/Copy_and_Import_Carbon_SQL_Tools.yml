@@ -1,0 +1,39 @@
+---
+- import_tasks: copy_archives.yml
+  
+- name: Copy files from installer_location
+  win_robocopy:
+    src: '{{ installer_location }}\{{ files.source }}'
+    dest: "{{ files.dest }}"
+    recurse: yes
+    flags: "{{ files.flag }}"
+  loop:
+  - { source: 'SQL-CFG\PowerShellModules', dest: 'C:\Program Files\WindowsPowerShell\Modules' , flag: '/E' }
+  - { source: 'SQL-CFG', dest: 'D:\Install\SQL-CFG' , flag: '/E' }
+  - { source: 'IseriesDriver\Iseries_64 bit', dest: 'D:\Install\IBM\Iseries_64 bit' , flag: '/MIR' }
+  - { source: 'IseriesDriver', dest: 'D:\Install\IBM', flag: 'IbmClient*.iss'}
+  - { source: 'Oracle Client', dest: 'D:\Install\Oracle\12C' , flag: '/MIR' }
+  - { source: 'SQL{{ SqlVersion }}\InstallPatches', dest: 'D:\Install\SQL{{ SqlVersion }}\InstallPatches' , flag: '/MIR' }
+  - { source: '.', dest: 'D:\Install\SQL{{ SqlVersion }}' , flag: 'SQLServer2005_BC_x64*.msi' }
+  loop_control:
+    loop_var: files
+
+- name: Import Module Carbon
+  win_psmodule:
+    name: Carbon
+    state: present
+    
+- name: Copy the files locally
+  win_robocopy:
+    src: "{{ localDir.source }}"
+    dest: "{{ localDir.dest }}"
+    flags: "{{ localDir.flag }}"
+  loop:
+  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}DBA\Scripts' , flag: '*.ps1' }
+  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}DBA\Scripts\', flag: '*.vbs'  }
+  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}DBA\Scripts\', flag: '"Daily SQL Audit - HTML RMO.sql"'  }
+  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}DBA\Scripts\', flag: 'script_users_for_db_refresh.sql'  }
+  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}DBA\Scripts\', flag: 'DBA_-_Collect_Inventory_Info.sql'  }
+  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}DBA\Reports\', flag: '*.rdl'  }
+  loop_control:
+    loop_var: localDir

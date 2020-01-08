@@ -1,0 +1,18 @@
+---
+- name: Copy dump to local
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ source_user_env }}"
+  fetch:
+    src: '{{ oracle_tmp }}/{{ export_filename }}.dmp'
+    dest: .
+  when: inventory_hostname == master_node
+
+- name: Copy dump from local to target
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ source_user_env }}"
+  copy:
+    src: './{{ ansible_play_hosts[0] }}/{{ oracle_tmp }}/{{ export_filename }}.dmp'
+    dest: '{{ oracle_tmp }}/{{ export_filename }}.dmp'
+  when: inventory_hostname != master_node

@@ -1,0 +1,45 @@
+---
+- include_vars: secrets.yml
+  no_log: False
+
+- debug: msg="API call out"
+
+- name: db checklist status post for RDBMS Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "RDBMS Software Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    standard_task_id: "{{ standard_task_id }}"
+    task_message: "Install RDBMS Software for {{ ansible_hostname }} "
+  tags:
+  - apex_api
+
+- include: determine_db_home.yml
+  when:
+  - oracle_db_home is not defined
+#  - inventory_hostname == master_node
+
+- name: copy oracle_db_home fact to other nodes
+  set_fact:
+    oracle_db_home: "{{ hostvars[master_node]['oracle_db_home'] }}"
+  when:
+  - oracle_db_home is not defined
+  - inventory_hostname == master_node
+  
+- include: copy_archives.yml
+
+- name: create cluster_node_string
+  set_fact:
+    cluster_node_string: "{{ cluster_node_string | default([]) }} + [ '{{ hostvars[node_name]['ansible_hostname'] }}' ]"
+  loop: "{{ cluster_nodes.split(',') if ',' in cluster_nodes else cluster_nodes }}"
+  loop_control:
+    loop_var: node_name
+
+- include: prep_rsp_file.yml
+  when: inventory_hostname == master_node
+
+- include: oracle.yml

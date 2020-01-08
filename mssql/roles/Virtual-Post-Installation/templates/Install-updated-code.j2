@@ -1,0 +1,32 @@
+Sqlcmd -S {{ ansible_hostname }} -d "msdb" -E -x -i "D:\Install\SQL-CFG\NewSp.sql"
+Sqlcmd -S {{ ansible_hostname }} -d "msdb" -E -x -i "D:\Install\SQL-CFG\Update SQLDBA to Version 3.5.sql"
+Sqlcmd -S {{ ansible_hostname }} -d "msdb" -E -x -i "D:\Install\SQL-CFG\Update SQLDBA to Version 3.6.sql"
+Sqlcmd -S {{ ansible_hostname }} -d "msdb" -E -x -i "D:\Install\SQL-CFG\Update SQLDBA to Version 3.7.sql"
+Sqlcmd -S {{ ansible_hostname }} -d "msdb" -E -x -i "D:\Install\SQL-CFG\Update SQLDBA to Version 3.8.sql"
+
+Sqlcmd -S {{ ansible_hostname }} -d "SQLDBA" -E -x -i "D:\Install\SQL-CFG\CollectDownTime.sql"
+
+Sqlcmd -S {{ ansible_hostname }} -d "SQLDBA" -E -x -i "D:\Install\SQL-CFG\DatabaseHealth.sql"
+
+Sqlcmd -S {{ ansible_hostname }} -d "SQLDBA" -E -x -i "D:\Install\SQL-CFG\DBA - Drop Old Tables in HOLDING.sql"
+
+Sqlcmd -S {{ ansible_hostname }} -d "SQLDBA" -E -x -i "D:\Install\SQL-CFG\LoginAuditTrigger.sql"
+
+Sqlcmd -S {{ ansible_hostname }} -d "SQLDBA" -E -x -i "D:\Install\SQL-CFG\New Database trigger.sql"
+
+Sqlcmd -S {{ ansible_hostname }} -d "SQLDBA" -E -x -i "D:\Install\SQL-CFG\SSISDB-Optimization.sql"
+
+$Qry = "IF  EXISTS (SELECT job_id FROM msdb.dbo.sysjobs_view WHERE name = N'DBA - Collect Inventory Info') 
+        EXEC msdb.dbo.sp_delete_job @job_name=N'DBA - Collect Inventory Info', @delete_unused_schedule=1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+SqlCmd -S {{ ansible_hostname }} -d "msdb" -E -x -i {{ NewFile2 }}
+
+$Qry = "EXECUTE msdb.dbo.sysmail_update_account_sp @account_name = 'CHTR', @email_address = '{{ ansible_hostname }}@chartercom.com', @display_name = '{{ ansible_hostname }}';"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+$Qry = "EXECUTE msdb.dbo.sysmail_update_account_sp @account_name = 'CHTR', @mailserver_name = 'mail-relay.twcable.com'"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"
+
+$Qry = "EXEC msdb.dbo.sp_update_job @job_name='DBA - Drop Old Tables in HOLDING',@enabled = 1"
+Invoke-SqlCmd -QueryTimeout 0 -query $Qry -serverinstance {{ ansible_hostname }} -database "master"

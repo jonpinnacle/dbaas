@@ -1,0 +1,7 @@
+---
+
+oracle_tmp: /u01/tmp/prereqs
+
+golden_gate_check: False
+
+standard_task_id: "0"

@@ -1,0 +1,5 @@
+---
+# vars file for mssql_aws
+ansible_connection: local
+ansible_port: 22
+awx_api_user: Sentrium

@@ -1,0 +1,19 @@
+---
+
+
+- debug:
+   var: ora_user_env
+
+- name: Check ACFS Driver State
+  environment: "{{ ora_user_env }}"
+  command: acfsdriverstate installed
+  register: acfsdriverstate_result
+  ignore_errors: yes
+  changed_when: False
+
+- name: Parse ACFS Driver State
+  set_fact:
+    acfsdriver_installed: "{{ acfsdriverstate_result.stdout |
+                              regex_search('ACFS-.*') |
+                              regex_replace('ACFS-[0-9]*: (.*)','\\1')
+                            }}"

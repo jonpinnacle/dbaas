@@ -1,0 +1,36 @@
+---
+
+oracle_version: 12.1.0.2
+
+grid_version: 12.1.0.2
+
+opatch_version_required: ""
+
+opatch_util_installer: ""
+
+patch_quarter: ""
+
+patch_year: ""
+
+psu_version: ""
+
+install_base: /u01/app
+
+oracle_base: "{{ install_base }}/oracle"
+ 
+
+oracle_db_home: ""
+
+oracle_db_name: ""
+grid_home: "/u01/app/12.1.0.2/grid_1"
+gi_sid: +ASM
+
+fresh_install: False
+
+patch_type: ""
+
+opatch_flags: ""
+
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB
+standard_task_id: "0"
+oracle_psu_home: "{{ oracle_db_home }}"

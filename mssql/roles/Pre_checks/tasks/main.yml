@@ -1,0 +1,610 @@
+---
+- include_vars: Physical-Secrets.yml
+  ignore_errors: yes
+
+- name: db checklist status post for Pre-check
+  include: db_checklist_status.yml
+  ignore_errors: yes
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Pre-check"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "Pre-check for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- name: Ping the node and check for connectivity
+  win_ping:
+  register: ping_status
+
+- name: Create temp directory
+  win_file:
+    path: "{{ ansible_directory }}"
+    state: directory
+
+- name: Create a quorum_defined ps1 file
+  win_template:
+    src: quorum_defined.ps1.j2
+    dest: "{{ ansible_directory }}\\quorum_defined.ps1"
+
+- name: Run the quorum_defined script
+  win_shell: "{{ ansible_directory }}\\quorum_defined.ps1"
+  register: quorum_defined_status
+  ignore_errors: True
+
+- name: debug the ping output
+  debug:
+    msg: "{{ ping_status}}"
+
+- name: Check for the OS details
+  setup:
+  register: os_details
+
+- name: debug the output of os details
+  debug:
+    msg:
+      - "OS Architecture: {{ os_details.ansible_facts.ansible_architecture }}"
+      - "OS Distribution: {{ os_details.ansible_facts.ansible_distribution }}"
+      - "OS Type: {{ os_details.ansible_facts.ansible_env.OS }}"
+
+
+- name: Set the value of os details
+  set_fact:
+    os_detail: "{% if os_details.ansible_facts.ansible_distribution == 'Microsoft Windows Server 2012 R2 Standard' -%}
+          WINDOWS_2012R2{%- elif os_details.ansible_facts.ansible_distribution == 'Microsoft Windows Server 2016 R2 Standard' -%}WINDOWS_2016
+          {%- else -%}NA{%- endif %}"
+
+- name: Set the value of os details
+  set_fact:
+    os_check: "{% if os_detail == OSName -%}PASS
+          {%- else -%}FAIL{%- endif %}"
+
+- name: Check for RAM details
+  debug:
+    msg: The current RAM of the instance is {{ (ansible_memtotal_mb/1024)|round|int }} GB
+
+- name: Check for CPU details
+  debug:
+    msg:
+      - CPU PROCESSOR ARCHITECTURE of the instance is {{ ansible_env.PROCESSOR_ARCHITECTURE }}
+      - CPU PROCESSOR IDENTIFIER  of the instance is {{ ansible_env.PROCESSOR_IDENTIFIER }}
+      - CPU processor cores of the instance are {{ ansible_processor_cores }}
+      - CPU processor count of the instance are {{ ansible_processor_count }}
+      - CPU processor threads per core of the instance are {{ ansible_processor_threads_per_core }}
+
+- name: Set the value of CPU details
+  set_fact:
+    cpu_details:
+      - CPU PROCESSOR ARCHITECTURE of the instance is {{ ansible_env.PROCESSOR_ARCHITECTURE }}
+      - CPU PROCESSOR IDENTIFIER  of the instance is {{ ansible_env.PROCESSOR_IDENTIFIER }}
+      - CPU processor cores of the instance are {{ ansible_processor_cores }}
+      - CPU processor count of the instance are {{ ansible_processor_count }}
+      - CPU processor threads per core of the instance are {{ ansible_processor_threads_per_core }}
+
+- name: Check for the domain name the instance is connected
+  debug:
+    msg: The domain connected to the instance user is {{ ansible_env.USERDOMAIN }}
+
+- name: Create Ansible Temp  Directory
+  win_file:
+    path: "{{ ansible_directory }}"
+    state: directory
+
+# - name: Copy all the powershell files
+#   win_copy:
+#     src: "{{ items }}"
+#     dest: "{{ ansible_directory }}\\{{ items }}"
+#   loop: "{{ ps1_files }}"
+#   loop_control:
+#     loop_var: items
+
+- name: Create a verify admin group ps1 file
+  win_template:
+    src: verify_admin_groups.ps1.j2
+    dest: "{{ ansible_directory }}\\verify_admin_groups.ps1"
+
+- name: Run the admin group check script
+  win_shell: "{{ ansible_directory }}\\verify_admin_groups.ps1"
+  register: admin_groups_check
+
+- name: Create a check_listner_name_access_control ps1 file
+  win_template:
+    src: check_listner_name_access_control.ps1.j2
+    dest: "{{ ansible_directory }}\\check_listner_name_access_control.ps1"
+
+- name: Run the check_listner_name_access_control script
+  win_shell: "{{ ansible_directory }}\\check_listner_name_access_control.ps1"
+  register: listner_name_access_control
+
+- name: Create a check_listner_name_defined ps1 file
+  win_template:
+    src: check_listner_name_defined.ps1.j2
+    dest: "{{ ansible_directory }}\\check_listner_name_defined.ps1"
+
+- name: Run the check_listner_name_defined script
+  win_shell: "{{ ansible_directory }}\\check_listner_name_defined.ps1"
+  register: listner_name_defined
+
+- name: Check the disk details of OS drive
+  win_shell: Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='C:'" | ForEach-Object {[math]::Round($_.size / 1GB)}
+  register: os_drive_size
+
+- name: Check space on OS drive
+  set_fact:
+     disk_size_OS: "{{ os_drive_size.stdout| trim}}"
+
+- name: Check the disk details of D drive
+  win_shell: Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='D:'" | ForEach-Object {[math]::Round($_.size / 1GB)}
+  register: d_drive_size
+
+- name: Check space on D drive
+  set_fact:
+     disk_size_D: "{{ d_drive_size.stdout| trim }}"
+
+- name: Check the disk details of E drive
+  win_shell: Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='E:'" | ForEach-Object {[math]::Round($_.size / 1GB)}
+  register: e_drive_size
+
+- name: Check space on E drive
+  set_fact:
+     disk_size_E: "{{ e_drive_size.stdout| trim}}"
+
+- name: Check the disk details of F drive
+  win_shell: Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='F:'" | ForEach-Object {[math]::Round($_.size / 1GB)}
+  register: f_drive_size
+
+- name: Check space on F drive
+  set_fact:
+     disk_size_F: "{{ f_drive_size.stdout| trim }}"
+
+- name: Check the disk details of G drive
+  win_shell: Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='G:'" | ForEach-Object {[math]::Round($_.size / 1GB)}
+  register: g_drive_size
+
+- name: Check space on G drive
+  set_fact:
+     disk_size_G: "{{ g_drive_size.stdout| trim}}"
+
+- name: Check the disk details of H drive
+  win_shell: Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='H:'" | ForEach-Object {[math]::Round($_.size / 1GB)}
+  register: h_drive_size
+
+- name: Check space on H drive
+  set_fact:
+     disk_size_H: "{{ h_drive_size.stdout| trim }}"
+
+- name: Check the disk details of I drive
+  win_shell: Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='I:'" | ForEach-Object {[math]::Round($_.size / 1GB)}
+  register: i_drive_size
+
+- name: Check space on I drive
+  set_fact:
+     disk_size_I: "{{ i_drive_size.stdout| trim }}"
+
+- name: Check the disk details of J drive
+  win_shell: Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='J:'" | ForEach-Object {[math]::Round($_.size / 1GB)}
+  register: j_drive_size
+
+- name: Check space on J drive
+  set_fact:
+     disk_size_J: "{{ j_drive_size.stdout| trim }}"
+
+- name: Check the disk details of K drive
+  win_shell: Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='K:'" | ForEach-Object {[math]::Round($_.size / 1GB)}
+  register: k_drive_size
+
+- name: Check space on K drive
+  set_fact:
+     disk_size_K: "{{ k_drive_size.stdout| trim }}"
+
+- name: debug drive sizes
+  debug:
+    msg: "disk_size_OS: {{disk_size_OS}} disk_size_D: {{disk_size_D}} disk_size_E: {{disk_size_E}} disk_size_F: {{disk_size_F}} disk_size_G: {{disk_size_G}} disk_size_H: {{disk_size_H}} disk_size_I: {{disk_size_I}} disk_size_J: {{disk_size_J}} disk_size_K: {{disk_size_K}}"
+
+
+# - name: Check the NTFS Allocation size for drive set to 64k
+#   win_shell: fsutil fsinfo ntfsinfo C:\
+#   register: ntfs_allocation_output
+#   ignore_errors: True
+#
+# - name: Check the size of ntfs allocation
+#   set_fact:
+#     ntfs_allocation_size: "{{ ntfs_allocation_output.stdout_lines[9]| trim| replace('Bytes Per Cluster :', '')| trim }}"
+#########################
+
+- name: Check the NTFS Allocation size  of backup drive  set to 64k
+  win_shell: fsutil fsinfo ntfsinfo "{{ BuPath }}"
+  register: ntfs_allocation_output_BuPath
+  ignore_errors: True
+
+- name: Check the size of ntfs allocation of backup drive
+  set_fact:
+    ntfs_allocation_size_BuPath: "{{ ntfs_allocation_output_BuPath.stdout_lines[9]| trim| replace('Bytes Per Cluster :', '')| trim }}"
+
+- name: Check the NTFS Allocation size  of data drive  set to 64k
+  win_shell: fsutil fsinfo ntfsinfo "{{ DataPath }}"
+  register: ntfs_allocation_output_DataPath
+  ignore_errors: True
+
+- name: Check the size of ntfs allocation of data drive
+  set_fact:
+    ntfs_allocation_size_DataPath: "{{ ntfs_allocation_output_DataPath.stdout_lines[9]| trim| replace('Bytes Per Cluster :', '')| trim }}"
+
+- name: Check the NTFS Allocation size  of logs drive  set to 64k
+  win_shell: fsutil fsinfo ntfsinfo "{{ LogPath }}"
+  register: ntfs_allocation_output_LogPath
+  ignore_errors: True
+
+- name: Check the size of ntfs allocation of logs drive
+  set_fact:
+    ntfs_allocation_size_LogPath: "{{ ntfs_allocation_output_LogPath.stdout_lines[9]| trim| replace('Bytes Per Cluster :', '')| trim }}"
+
+- name: Check the NTFS Allocation size  of system drive  set to 64k
+  win_shell: fsutil fsinfo ntfsinfo "{{ SystemPath }}"
+  register: ntfs_allocation_output_SystemPath
+  ignore_errors: True
+
+- name: Check the size of ntfs allocation of system drive
+  set_fact:
+    ntfs_allocation_size_SystemPath: "{{ ntfs_allocation_output_SystemPath.stdout_lines[9]| trim| replace('Bytes Per Cluster :', '')| trim }}"
+
+- name: Check the NTFS Allocation size  of temp drive  set to 64k
+  win_shell: fsutil fsinfo ntfsinfo "{{ TempdbPath }}"
+  register: ntfs_allocation_output_TempdbPath
+  ignore_errors: True
+
+- name: Check the size of ntfs allocation of temp drive
+  set_fact:
+    ntfs_allocation_size_TempdbPath: "{{ ntfs_allocation_output_TempdbPath.stdout_lines[9]| trim| replace('Bytes Per Cluster :', '')| trim }}"
+
+- name: Collecting Drives layout
+  win_shell: wmic logicaldisk get caption
+  register: drives_layout_details
+
+- name: Drives layout details
+  debug:
+    msg: "{{ drives_layout_details.stdout_lines}}"
+
+- name: check the sqlcmd utility is installed or not
+  win_shell: sqlcmd -?  | Select-String -Pattern 'Tool' -CaseSensitive -SimpleMatch
+  register: sqlcmd_status
+  ignore_errors: true
+
+- name: print the status of SQLCMD installed or not
+  debug:
+    msg: "{% if sqlcmd_status.stdout | trim == 'Microsoft (R) SQL Server Command Line Tool' -%} The SQLCMD utility is installed
+            {%- else -%}The SQLCMD utility is  not installed so the next HyperV Status task would fail
+            {%- endif %}"
+
+- name: Check HyperV VM built on proper HyperV cluster
+  win_shell: |
+    $Qry = "select cluster from {{ charter_dba }}.dbo.[vW_HyperVInventory] where name = '{{ ansible_env.COMPUTERNAME }}'"
+
+    Invoke-SqlCmd -query $Qry -serverinstance {{ SQLInst }} -database "master" -username "{{ username }}" -password "{{ password }}"
+  ignore_errors: yes
+  register: hyperv_status
+
+- name: print the Hyper V Status
+  debug:
+    msg: "{{ hyperv_status }}"
+
+- name: set hyperv_status for stdout
+  set_fact:
+    hyperv_status_check: "{{ hyperv_status.stdout }}"
+  when: hyperv_status.stdout != ""
+  ignore_errors: yes
+
+- name: set hyperv_status for stderr
+  set_fact:
+    hyperv_status_check: "{{ hyperv_status.stderr }}"
+  when: hyperv_status.stderr != ""
+  ignore_errors: yes
+
+- name: Create a node_joined_to_cluster ps1 file
+  win_template:
+    src: node_joined_to_cluster.ps1.j2
+    dest: "{{ ansible_directory }}\\node_joined_to_cluster.ps1"
+
+- name: Create a quorum_defined ps1 file
+  win_template:
+    src: quorum_defined.ps1.j2
+    dest: "{{ ansible_directory }}\\quorum_defined.ps1"
+
+- name: Run the cluster node Status script
+  win_shell: "{{ ansible_directory }}\\node_joined_to_cluster.ps1"
+  register: cluser_node_status
+  ignore_errors: True
+
+- name: Get the no of nodes in cluster
+  win_shell: "Import-Module FailoverClusters; ( Get-ClusterNode | Measure-Object -line).Lines"
+  register: cluster_nodes
+
+- name: Get the UP status of each node
+  win_shell: "Import-Module FailoverClusters;(Get-ClusterNode | Where-Object {$_.State -match 'Up'} | measure-object -line).Lines"
+  register: up_status
+
+- name: quorum_defined_status for stdout
+  set_fact:
+    quorum_defined_status_check: "{{ quorum_defined_status.stdout }}"
+  when: quorum_defined_status.stdout != ""
+
+- name: set quorum_defined_status for stderr
+  set_fact:
+    quorum_defined_status_check: "{{ quorum_defined_status.stderr }}"
+  when: quorum_defined_status.stderr != ""
+
+- name: set quorum_defined_status for stderr and stdout
+  set_fact:
+    quorum_defined_status_check: "file share witness does not exists"
+  when: quorum_defined_status.stderr == "" and quorum_defined_status.stdout == ""
+
+- name: check the online status of file share witness
+  win_shell: "Import-Module FailoverClusters;get-clusterresource  | where-object {$_.Name -like 'File Share Witness'} | Where-Object {$_.State -eq 'Online'}"
+  register: file_share_status
+  ignore_errors: True
+
+- set_fact:
+    checklist:
+    - name: Ping server status
+      expected_value: "The status of Ping should be pong"
+      actual_value: "{{ ping_status.ping}}"
+      status: "{% if ping_status.ping == 'pong' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Check connectivity with the node
+      expected_value: "Node should be connected"
+      actual_value: "{% if ping_status.ping == 'pong' -%}Connected
+                {%- else -%}Not Reachable
+                {%- endif %}"
+      status: "{% if ping_status.ping == 'pong' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Check for OS details
+      expected_value: "{{ OSName }}"
+      actual_value: "{{os_detail}}"
+      status: "{{os_check}}"
+
+    - name: Expected RAM in GB's
+      expected_value:   "{{ expected_ram }}"
+      actual_value: "{{ (ansible_memtotal_mb/1024)|round|int}}"
+      status: "{% if (ansible_memtotal_mb/1024)|round|int == expected_ram -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: Check for CPU details
+      expected_value: "{{ expected_cpu_processor_core }}"
+      actual_value: "{{ cpu_details }}"
+      status: "{% if ansible_processor_cores == expected_cpu_processor_core -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Check for Domain the user is attached
+      expected_value: "{{ Domain }}"
+      actual_value: "{{ ansible_env.USERDOMAIN }}"
+      status: "{% if ansible_env.USERDOMAIN == Domain -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Check the DBA AD group is part of Administrators group
+      expected_value: "Success: DBA group is in Administrator group"
+      actual_value: "{{ admin_groups_check.stdout | trim }}"
+      status: "{% if admin_groups_check.stdout | trim == 'Success: DBA group is in Administrator group' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Check Listener Name Defined in AD
+      expected_value: "Success: Listener name is in AD"
+      actual_value: "{{ listner_name_defined.stdout | trim }}"
+      status: "{% if listner_name_defined.stdout | trim == 'Success: Listener name is in AD' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Cluster Name has full control of Listener Name in AD
+      expected_value: "Success: Cluster has full control of listener"
+      actual_value: "{{ listner_name_access_control.stdout | trim }}"
+      status: "{% if listner_name_access_control.stdout | trim == 'Success: Cluster has full control of listener' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+
+    - name: NTFS Allocation size for Backup drive set to 64KB (65536)
+      expected_value: "65536"
+      actual_value: "{{ ntfs_allocation_size_BuPath }}"
+      status: "{% if ntfs_allocation_size_BuPath >= '65536' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: NTFS Allocation size for data drive set to 64KB (65536)
+      expected_value: "65536"
+      actual_value: "{{ ntfs_allocation_size_DataPath }}"
+      status: "{% if ntfs_allocation_size_DataPath >= '65536' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: NTFS Allocation size for logs drive set to 64KB (65536)
+      expected_value: "65536"
+      actual_value: "{{ ntfs_allocation_size_LogPath }}"
+      status: "{% if ntfs_allocation_size_LogPath >= '65536' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: NTFS Allocation size for system drive set to 64KB (65536)
+      expected_value: "65536"
+      actual_value: "{{ ntfs_allocation_size_SystemPath }}"
+      status: "{% if ntfs_allocation_size_SystemPath >= '65536' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: NTFS Allocation size for temp drive set to 64KB (65536)
+      expected_value: "65536"
+      actual_value: "{{ ntfs_allocation_size_TempdbPath }}"
+      status: "{% if ntfs_allocation_size_TempdbPath >= '65536' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+
+    - name: Check for Nodes joined to cluster are up
+      expected_value: "UP"
+      actual_value: "{{ cluser_node_status.stdout_lines }}"
+      status: "{% if cluster_nodes|trim|int == up_status|trim|int -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+
+    - name: Check for Quorum Defined
+      expected_value: "Online"
+      actual_value: "{{ quorum_defined_status_check }}"
+      status: "{% if file_share_status.stdout != '' -%}PASSED
+                {%- else -%}FAILED
+                {%- endif %}"
+#    - name: NTFS Allocation size for SQL drives set to 64k
+#      expected_value: "64 K"
+#      actual_value: "{{ ntfs_allocation_size }}"
+#      status: "{% if ntfs_allocation_size >= '65536' -%}PASSED
+#               {%- else -%}FAILED
+#               {%- endif -%}"
+
+    - name: Drives layout details
+      expected_value: ""
+      actual_value: "{{ drives_layout_details.stdout_lines }}"
+      status: ""
+
+    - name: Drive size of OS Disk
+      expected_value: "{{ expected_c_drive_size }} GB"
+      actual_value: "{% if disk_size_OS == '' -%}No drive of this name
+                     {%- else -%}'{{ disk_size_OS }} GB'
+                     {%- endif -%}"
+      status: "{% if disk_size_OS|int == expected_c_drive_size -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: Drive size of D
+      expected_value: "{{ expected_d_drive_size }} GB"
+      actual_value: "{% if disk_size_D == '' -%}No drive of this name
+                     {%- else -%}'{{ disk_size_D }} GB'
+                     {%- endif -%}"
+      status: "{% if disk_size_D|int == expected_d_drive_size  -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: Drive size of E
+      expected_value: "{{ expected_e_drive_size }} GB"
+      actual_value: "{% if disk_size_E == '' -%}No drive of this name
+                     {%- else -%}'{{ disk_size_E }} GB'
+                     {%- endif -%}"
+      status: "{% if disk_size_E|int == '{{ expected_e_drive_size }}' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: Drive size of F
+      expected_value: "{{ expected_f_drive_size }} GB"
+      actual_value: "{% if disk_size_F == '' -%}No drive of this name
+                     {%- else -%}'{{ disk_size_F }} GB'
+                     {%- endif -%}"
+      status: "{% if disk_size_F|int == '{{ expected_f_drive_size }}' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: Drive size of G
+      expected_value: "{{ expected_g_drive_size }} GB"
+      actual_value: "{% if disk_size_G == '' -%}No drive of this name
+                     {%- else -%}'{{ disk_size_G }} GB'
+                     {%- endif -%}"
+      status: "{% if disk_size_G|int == '{{ expected_g_drive_size }}' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: Drive size of H
+      expected_value: "{{ expected_h_drive_size }} GB"
+      actual_value: "{% if disk_size_H == '' -%}No drive of this name
+               {%- else -%}'{{ disk_size_H }} GB'
+               {%- endif -%}"
+
+      status: "{% if disk_size_H|int == '{{ expected_h_drive_size }}' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: Drive size of I
+      expected_value: "{{ expected_i_drive_size }} GB"
+      actual_value: "{% if disk_size_I == '' -%}No drive of this name
+                     {%- else -%}'{{ disk_size_I }} GB'
+                     {%- endif -%}"
+      status: "{% if disk_size_I|int == '{{ expected_i_drive_size }}' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: Drive size of J
+      expected_value: "{{ expected_j_drive_size }} GB"
+      actual_value: "{% if disk_size_J == '' -%}No drive of this name
+                     {%- else -%}'{{ disk_size_J }} GB'
+                     {%- endif -%}"
+      status: "{% if disk_size_J|int == '{{ expected_j_drive_size }}' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    - name: Drive size of K
+      expected_value: "{{ expected_k_drive_size }} GB"
+      actual_value: "{% if disk_size_K == '' -%}No drive of this name
+                     {%- else -%}'{{ disk_size_K }} GB'
+                     {%- endif -%}"
+      status: "{% if disk_size_K|int == '{{ expected_k_drive_size }}' -%}PASSED
+               {%- else -%}FAILED
+               {%- endif -%}"
+
+    # - name: Check HyperV VM built on proper HyperV cluster
+    #   expected_value: ""
+    #   actual_value: "{{ hyperv_status_check }}"
+    #   status: ""
+
+- name: Debug the checklist
+  debug:
+    msg: "{{ checklist }}"
+
+- name: Store the result in a json
+  win_copy:
+    dest: "{{ ansible_tmp }}/pre_validation_result.json"
+    content: "{{ checklist }}"
+
+
+- name: db checklist status file upload for Pre-Check
+  include: db_checklist_status_file.yml
+  ignore_errors: yes
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Pre-check"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload Checklist"
+    task_message: "Post-check {{ ansible_hostname }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    standard_task_id: "{{ standard_task_id }}"
+    logfile_path:  "{{ ansible_tmp }}/pre_validation_result.json"
+  tags:
+  - apex_api
+
+- name: db checklist status post for Pre-Check
+  include: db_checklist_status.yml
+  ignore_errors: yes
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Pre-check"
+    task_id: "{{ ticket_ref }}"
+    standard_task_id: "{{ standard_task_id }}"
+    task_status: "{% if checklist | json_query('[?status == `FAILED`]') | length > 1 -%}FAILED
+                  {%- else -%}SUCCESSFUL
+                  {%- endif %}"
+    task_message: "Post-check for {{ ansible_hostname }} "
+    tags:
+    - apex_api
+
+- name: Check for Precheck Failures
+  fail:
+    msg: "{% if checklist | json_query('[?status == `FAILED`]') | length == 1 -%}You have 1 failed check
+          {%- else -%}You have {{ checklist | json_query('[?status == `FAILED`]') | length }} failed checks
+          {%- endif %}"
+  when: checklist | json_query('[?status == `FAILED`]') | length > 0
+  tags:
+    - precheck_fail

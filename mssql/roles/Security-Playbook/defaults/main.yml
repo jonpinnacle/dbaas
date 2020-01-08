@@ -1,0 +1,26 @@
+---
+#Enter an Environment (LAB, DEV, UAT, TST, QA, SIT, DR, PRD)
+Env1: DEV
+#What Data Center is this being built in? (GVL, NCE, NCW)
+DC: NCE
+#What Domain is this being installed on? (CHTR, Corp, DEV, TWCCORP, TWZDMZ, UAT)
+Domain: CHTR
+#Backup Path
+BuPath: 'H:\Backups'
+#Data Path
+DataPath: 'G:\Data'
+#Log Path
+LogPath: 'J:\Logs'
+#System Path
+SystemPath: 'F:\System'
+#Temdb Path
+TempdbPath: 'I:'
+#Enter SQL Version (2012, 2014, 2016, 2017)
+SqlVersion: 2016
+#SQL MGT Server Details(Centralized DB Server)
+SQLInst: 142.136.196.228
+#Variables for SQL-2 file
+database: master 
+username: admin
+# #  Enable TCP and Set port (enter "0" for Yes and "1" for No)
+resultTCP: 0 

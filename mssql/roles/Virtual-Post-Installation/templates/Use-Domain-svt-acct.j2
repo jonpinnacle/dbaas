@@ -1,0 +1,112 @@
+
+$cn = New-Object System.Data.SqlClient.SqlConnection
+
+$cn.ConnectionString = "Data Source={{ SQLInst }}; User ID={{ username }}; Password={{ password }}; Initial Catalog=master"
+
+$cn.Open()
+# Fetch Server list into the Data source from Srv.ServerList Table from CentralDB
+$ds = new-object "System.Data.DataSet" "dspw"
+
+
+If ('{{ Domain }}' -eq 'TWCDMZ')
+{
+	$q = "SELECT [PValue] AS 'Value' FROM [CHARTER_DBA].[MGT].[Parameters] WHERE [PName] = 'TWC DMZ SVC PW';"
+}
+
+If ('{{ Domain }}' -eq 'TWCCORP')
+{
+	$q = "SELECT [PValue] AS 'Value' FROM [CHARTER_DBA].[MGT].[Parameters] WHERE [PName] = 'TWC SVC PW';"
+}
+
+If ('{{ Domain }}' -eq 'CHTR')
+{
+	$q = "SELECT [PValue] AS 'Value' FROM [CHARTER_DBA].[MGT].[Parameters] WHERE [PName] = 'CHTR SVC PW';"
+}
+
+If ('{{ Domain }}' -eq 'DEV')
+{
+	$q = "SELECT [PValue] AS 'Value' FROM [CHARTER_DBA].[MGT].[Parameters] WHERE [PName] = 'DEV SVC PW';"
+}
+
+If ('{{ Domain }}' -eq 'UAT')
+{
+	$q = "SELECT [PValue] AS 'Value' FROM [CHARTER_DBA].[MGT].[Parameters] WHERE [PName] = 'UAT SVC PW';"
+}
+
+If ('{{ Domain }}' -eq 'Corp')
+{
+	$q = "SELECT [PValue] AS 'Value' FROM [CHARTER_DBA].[MGT].[Parameters] WHERE [PName] = 'BHN SVC PW';"
+}
+
+$da = new-object "System.Data.SqlClient.SqlDataAdapter" ($q, $cn)
+$da.Fill($ds)
+$cn.Close()
+
+$dtServerList = $ds.Tables[0]
+$SvrList = $dtServerList | Select Value
+$PWord = $SvrList.Value
+#load assemblies
+[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO') | out-null
+[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.ConnectionInfo') | out-null
+[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SqlWmiManagement') | out-null
+[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.ManagedDTS') | out-null
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.AnalysisServices") | out-null
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SqlWmiManagement") | out-null
+[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.VisualBasic') | Out-Null
+[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.Management.PowerShell.sqlps') | Out-Null
+# Load the IntegrationServices Assembly
+[Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.IntegrationServices") | Out-Null
+#load assemblies
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SMO") | Out-Null
+#Need SmoExtended for backup
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SmoExtended") | Out-Null
+Set-ExecutionPolicy Unrestricted -Force
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SMO") | Out-Null
+#Need SmoExtended for backup
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SmoExtended") | Out-Null
+
+
+$SMOWmiserver = New-Object ('Microsoft.SqlServer.Management.Smo.Wmi.ManagedComputer') $SName #Suck in the server you want
+
+#Same information just pivot the data
+$SMOWmiserver.Services | select name, type, ServiceAccount, DisplayName, Properties, StartMode, StartupParameters | Format-List
+
+#Specify the "Name" (from the query above) of the one service whose Service Account you want to change.
+If ("{{ SqlVersion }}" -eq "2012")
+{
+	
+	$ChangeService = $SMOWmiserver.Services | where { $_.name -eq "MsDtsServer110" }
+	$ChangeService.SetServiceAccount("{{ UName }}", "$PWord")
+	
+	$ChangeService = $SMOWmiserver.Services | where { $_.name -eq "MSSQLSERVER" }
+	$ChangeService.SetServiceAccount("{{ UName }}", "$PWord")
+	
+	$ChangeService = $SMOWmiserver.Services | where { $_.name -eq "SQLSERVERAGENT" }
+	$ChangeService.SetServiceAccount("{{ UName }}", "$PWord")
+}
+
+If ("{{ SqlVersion }}" -eq "2014")
+{
+	
+	$ChangeService = $SMOWmiserver.Services | where { $_.name -eq "MsDtsServer120" }
+	$ChangeService.SetServiceAccount("{{ UName }}", "$PWord")
+	
+	$ChangeService = $SMOWmiserver.Services | where { $_.name -eq "MSSQLSERVER" }
+	$ChangeService.SetServiceAccount("{{ UName }}", "$PWord")
+	
+	$ChangeService = $SMOWmiserver.Services | where { $_.name -eq "SQLSERVERAGENT" }
+	$ChangeService.SetServiceAccount("{{ UName }}", "$PWord")
+}
+
+If ("{{ SqlVersion }}" -eq "2016")
+{
+	
+	$ChangeService = $SMOWmiserver.Services | where { $_.name -eq "MsDtsServer130" }
+	$ChangeService.SetServiceAccount("{{ UName }}", "$PWord")
+	
+	$ChangeService = $SMOWmiserver.Services | where { $_.name -eq "MSSQLSERVER" }
+	$ChangeService.SetServiceAccount("{{ UName }}", "$PWord")
+	
+	$ChangeService = $SMOWmiserver.Services | where { $_.name -eq "SQLSERVERAGENT" }
+	$ChangeService.SetServiceAccount("{{ UName }}", "$PWord")
+}

@@ -1,0 +1,73 @@
+# Need to uncomment this entry while running on charter lab
+UName: "{%- if Domain == 'CHTR' -%}chtr\\svc_sqlmail
+        {%- elif Domain =='TWCCORP' -%}TWCCORP\\SVSQLPRD
+        {%- elif Domain =='TWCDMZ' -%}TWCDMZ\\SVSQLPRD
+        {%- elif Domain =='UAT' -%}UAT\\svc_sqlmail
+        {%- elif Domain =='DEV' -%}DEV\\svc_sqlmail
+        {%- elif Domain =='Corp' -%}CORP\\sqlman
+        {%- endif %}"
+
+# I didnt see the usage of "Env" in post script
+Env:   "{%- if Env1 == 'LAB' -%}L
+        {%- elif Env1 == 'DEV' -%}D
+        {%- elif Env1 == 'UAT' -%}U
+        {%- elif Env1 == 'TST' -%}T
+        {%- elif Env1 == 'QA' -%}Q
+        {%- elif Env1 == 'SIT' -%}S
+        {%- elif Env1 == 'DR' -%}R
+        {%- elif Env1 == 'PRD' -%}P
+        {%- endif %}"
+
+GName: "{%- if Env1 == 'LAB' -%}SQL {{ SqlVersion }} LAB
+        {%- elif Env1 == 'DEV' -%}SQL {{ SqlVersion }} DEV
+        {%- elif Env1 == 'UAT' -%}SQL {{ SqlVersion }} UAT
+        {%- elif Env1 == 'TST' -%}SQL {{ SqlVersion }} TST
+        {%- elif Env1 == 'QA' -%}SQL {{ SqlVersion }} QA
+        {%- elif Env1 == 'SIT' -%}SQL {{ SqlVersion }} SIT
+        {%- elif Env1 == 'DR' -%}SQL {{ SqlVersion }} PRD
+        {%- elif Env1 == 'PRD' -%}SQL {{ SqlVersion }} PRD
+        {%- endif %}"
+
+NewFile2: '{{ SystemPath }}DBA\Scripts\{{ ansible_hostname }}-DBA_-_Collect_Inventory_Info.sql'
+
+ext: "{%- if SqlVersion == 2012 -%}11
+      {%- elif SqlVersion == 2014 -%}12
+      {%- elif SqlVersion == 2016 -%}13
+      {%- elif SqlVersion == 2017 -%}14
+      {%- endif %}"
+
+NewFile: 'D:\Install\SQL{{ SqlVersion }}\{{ ansible_hostname }}-ConfigurationFile.ini'
+
+
+
+folders_to_be_moved:
+    - msql_version: 2012
+      folders:
+        - 'SQL_Server_2012_ent_wSP3'
+        - 'SQL_Server_2012_SP3_cu7'
+        - 'SQL_Server_2012_dev_wSP3'
+        - 'SQL_Server_2012_SP4'
+        - 'SQL_Server_2012_HotFIx_4057116'
+    - msql_version: 2014
+      folders:
+        - 'SQL_Server_2014_SP2_cu4'
+        - 'SQL_Server_2014_SP2_CU10'
+        - 'SQL_Server_2014_ENT_wSP2'
+        - 'SQL_Server_2014_DEV_wSP2'
+    - msql_version: 2016
+      folders:
+        - 'SQL Server 2016 SP1 CU2'
+        - 'SQL_Server_2016_CU7'
+        - 'SQL_Server_2016_Ent_wSP1'
+        - 'SQL_Server_2016_Dev_wSP1'
+        - 'SSMS 2016'
+
+######################################
+## The following Vars are found in  ##
+## vars/Virtual-Secrets.yml         ##
+##                                  ##
+## FTP Server Details               ##
+##  - unc_password                  ##
+## SQL MGT Server Details           ##
+##  - password                      ##
+######################################

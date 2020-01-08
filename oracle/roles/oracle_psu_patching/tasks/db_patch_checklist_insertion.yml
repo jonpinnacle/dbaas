@@ -1,0 +1,39 @@
+---
+- debug:
+    var: chklst_json_body
+    
+- debug:
+    msg: "{{ apex_url }}/charter/insertdbpatchhistory"  
+
+- name: POST To Insert new Checklist entry
+  block:
+    - name: call api to insert db patch history
+      uri:
+        url: "{{ apex_url }}/charter/insertdbpatchhistory"
+        validate_certs: no  # should be removed after https certs becomes renewed
+        method: POST
+        body_format: json
+        body: "{{ chklst_json_body }}"
+        status_code: 200,201
+        headers:
+          Content-Type: "application/json"
+      ignore_errors: yes
+      register: checklist_insrt_response
+  rescue:
+    - name: Store the Json If APEX Server Is Down
+      delegate_to: localhost
+      become: no
+      lineinfile:
+        path: "{{ json_backup_dir }}/{{ oracle_db_name }}_patch_chklst_updates.json"
+        line: '{
+                    "host_name": "{{ ansible_hostname }}",
+                    "id": "{{ checklist_id }}",
+                    "update": {{ chklst_json_body | to_json }} 
+                }'
+        create: yes
+- name: set checklist_id
+  set_fact:
+    checklist_id: "{{ checklist_insrt_response.json.ID }}"
+
+- debug:
+    var: checklist_insrt_response

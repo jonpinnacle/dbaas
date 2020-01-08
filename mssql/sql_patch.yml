@@ -1,0 +1,6 @@
+- name: sql_patch
+  hosts: '{{ host }}'
+  tasks:
+    - name: sql_patch
+      import_role:
+        name: sql_patch

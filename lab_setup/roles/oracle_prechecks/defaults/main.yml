@@ -1,0 +1,6 @@
+---
+
+oracle_tmp: /u01/tmp/prereqs
+json_backup_dir: /tmp
+
+golden_gate_check: False

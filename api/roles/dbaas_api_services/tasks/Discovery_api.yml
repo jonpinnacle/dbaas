@@ -1,0 +1,23 @@
+---
+- name: POST in Discovery API Service
+  block: 
+  - name: Insert Discovery API Service
+    uri:
+      url: "{{ apex_url }}/{{ apex_uri }}/discoveryapi/post_json"
+      validate_certs: no  # should be removed after https certs becomes renewed
+      method: POST
+      body_format: json
+      body: "{{ discovery_json }}"
+      headers:
+        Content-Type: "application/json"
+        Cache-Control: "no-cache"
+        os_platform: "{{ os_platform }}"
+    register: Discovery_response
+  rescue:
+  - name: Store the Json If APEX Server Is Down
+    delegate_to: localhost
+    lineinfile:
+      path: "{{ json_backup_dir }}/Discovery_response.json"
+      line: "{{ Discovery_response  | to_json }}"
+      create: yes
+    when: Discovery_response.status == "500" or  Discovery_response.status == -1

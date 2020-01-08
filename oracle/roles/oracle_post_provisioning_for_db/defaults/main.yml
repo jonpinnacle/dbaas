@@ -1,0 +1,54 @@
+---
+
+oracle_version: 12.1.0.2
+
+grid_version: 12.1.0.2
+
+install_base: /u01/app
+
+oracle_base: "{{ install_base }}/oracle"
+
+# location for temporary files
+oracle_tmp: /u01/tmp/postval/{{ oracle_db_name }}
+
+
+oracle_db_home: db_1
+
+oracle_unique_name: "{{ oracle_db_name }}"
+
+oracle_home: "{{ oracle_base }}/product/{{ oracle_version }}/{{ oracle_db_home }}"
+
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB
+alter_params: false
+db_block_size: 8192
+sga_max_size: 6
+sga_target: 6
+sga_unit: G
+processes: 300
+pga_aggregate_target: 1
+pga_unit: G
+db_recovery_file_dest_size: 10
+db_recovery_file_dest_unit: G
+java_pool_size: 100
+java_pool_unit: M
+db_cache_size: 1
+db_cache_unit: G
+shared_pool_size: 500
+shared_pool_unit: M
+streams_pool_size: 100
+streams_pool_unit: M
+
+pre_check_sqls:
+  - pre_check_profile.sql
+  - pre_check_default_profile.sql
+  - pre_check_block_change.sql
+  - pre_check_audit_purge.sql
+  - awr_snapshot_interval.sql
+
+db_srv_type: primary
+
+standard_task_id: "0"
+#vars to be taken care
+# ORACLE_SID

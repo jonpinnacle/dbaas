@@ -1,0 +1,112 @@
+---
+- name: backup existing opatch
+  command: mv {{ oracle_home }}/OPatch {{ oracle_home }}/OPatch.old
+  args:
+    removes: "{{ oracle_home }}/OPatch"
+
+- name: host checklist post for Patching
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_patch_checklist_update.yml
+  vars:
+    chklst_json_body:
+      ID: "{{ checklist_id }}"
+      patch_status: Installing OPatch
+      new_entry: False
+  tags:
+  - apex_api
+
+- name: create the path to store the grid files
+  file:
+    path: "{{ oracle_installer_path }}/OPATCH"
+    state: directory
+    recurse: yes
+
+- name: get opatch installer from S3
+  aws_s3:
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    bucket: gfcloudsoftwarerepo
+    object: "ORACLE_DB/OPATCH/{{ opatch_util_installer }}"
+    dest: "{{ oracle_installer_path }}/OPATCH/{{ opatch_util_installer }}"
+    mode: get
+
+- name: install updated opatch ({{ opatch_version_required }})
+  ignore_errors: yes
+  unarchive:
+    src: "{{ oracle_installer_path }}/OPATCH/{{ opatch_util_installer }}"
+    dest: "{{ oracle_home }}"
+    remote_src: yes
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0755
+    validate_certs: no
+
+- import_tasks: check_opatch.yml
+
+- name: host checklist post for Patching
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_patch_checklist_update.yml
+  vars:
+    chklst_json_body:
+      patch_status: Installed OPatch
+      new_entry: False
+  when: opatch_version == opatch_version_required
+  tags:
+  - apex_api
+
+- name: Failure Block
+  block:
+  - name: restore opatch from backup
+    command: mv {{ oracle_home }}/OPatch.old {{ oracle_home }}/OPatch
+#   - name: host checklist post for Grid Install
+#     include_tasks: host_checklist_post_update.yml
+#     vars:
+#       chklst_json_body:
+#         new_entry: true
+#         ID: "{{ checklist_id }}"
+#         db_name: "{{ oracle_db_name }}"
+#         host_name: "{{ ansible_hostname }}"
+#         checklist_type: PATCHING
+#         checklist_category: Install
+#         db_install_status: OPATCH Install FAILED
+#     when: fresh_install
+#     tags:
+#     - apex_api
+
+- name: db checklist status post for PSU Patch
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "PSU BUNDLE PATCHING"
+    task_id: "{{ ticket_ref }}"
+    task_status: "FAILED"
+    task_message: "OPATCH Install Failed on {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  when: fresh_install
+  tags:
+  - apex_api
+
+
+- name: patch checklist post for Patching
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_patch_checklist_update.yml
+  vars:
+      chklst_json_body:
+        db_home: "{{ oracle_db_home }}"
+        host_name: "{{ ansible_hostname }}"
+        PSU_NUMBER: "{{ patch_num }}"
+        PSU_QUARTER: "{{ patch_quarter }}"
+        PSU_YEAR: "{{ patch_year }}"
+        patch_type: "{{ patch_type }}"
+        patch_status: OPATCH install FAILED
+        new_entry: true
+  tags:
+    - apex_api
+- fail:
+      msg: opatch not installed
+  when: opatch_version != opatch_version_required

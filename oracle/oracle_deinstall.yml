@@ -1,0 +1,16 @@
+---
+
+- name: install oracle database
+  hosts: '{{ host }}'
+  become: yes
+  any_errors_fatal: yes
+  tasks:
+  - import_role:
+      name: oracle_uninstall
+
+  ## Required vars    
+  # deinstall_product: either GRID or DATABASE
+  # oracle_db_home:  Only required for RDBMS deinstall. Home to deinstall (e.g. db_1)
+
+  ## Optional vars
+  # oracle_version (default: 12.1.0.2) 

@@ -1,0 +1,140 @@
+---
+
+- name: get db details
+  command: grep "^{{ oracle_db_name }}:" /etc/oratab
+  register: db_details
+  changed_when: False
+
+- name: set original_oracle_home
+  set_fact:
+    current_oracle_home: "{{ db_details.stdout | regex_replace('^[^:]*:([^:]*).*', '\\1') }}"
+
+- name: set oracle_db_home
+  set_fact:
+    oracle_db_home: "{{ current_oracle_home | basename }}"
+  when: oracle_db_home is not defined
+
+- name: get oracle_sid
+  shell: ps -ef | grep ora_smon_{{ oracle_db_name }} | grep -v grep | awk '{ print $8 }'
+  register: ps_grep_smon
+  changed_when: False
+
+- name: set oracle_sid
+  set_fact:
+    oracle_sid: "{{ ps_grep_smon.stdout | regex_replace('ora_smon_(.*)', '\\1') }}"
+
+- name: ensure 12c is installed
+  stat:
+    path: "{{ new_oracle_home }}/bin/dbua"
+  register: ora_12c_installed
+  tags:
+  - oracle_install
+
+- name: install 12c sw_only if needed
+  import_role:
+    name: oracle_rdbms_install
+  vars:
+    oracle_home: "{{ new_oracle_home }}"
+  when: ora_12c_installed.stat.exists == false
+  tags:
+  - oracle_install
+
+- include_tasks: db_checklist_post_update.yml
+  vars:
+    new_entry: True
+    checklist_type: "DB Upgrade"
+    checklist_category: Upgrade
+    db_install_status: IN PROGRESS
+  tags:
+  - apex_api
+
+- import_tasks: upgrade_prechecks.yml
+  vars:
+    oracle_home: "{{ current_oracle_home }}"
+  when: inventory_hostname == master_node
+  tags:
+  - prechecks
+
+- name: check for precheck failures
+  fail:
+    msg: There were {{ precheck_results_count.errors }} errors in the Precheck script
+  when: hostvars[master_node]["precheck_results_count"]["errors"] | int > 0
+  tags:
+  - prechecks
+
+- name: ensure needed directories in new home
+  file:
+    path: "{{ new_oracle_home }}/{{ curr_dir }}"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    state: directory
+    mode: 755
+  loop:
+  - dbs
+  - network/admin
+  loop_control:
+    loop_var: curr_dir
+  tags:
+  - copy
+
+- name: move ora and orapw files
+  copy:
+    src: "{{ current_oracle_home }}/{{ curr_file.sub_dir }}/{{ curr_file.filename }}"
+    dest: "{{ new_oracle_home }}/{{ curr_file.sub_dir }}"
+  loop:
+  - { filename: init.ora, sub_dir: dbs }
+  - { filename: "init{{ oracle_sid }}.ora", sub_dir: dbs }
+  - { filename: "orapw{{ oracle_sid }}", sub_dir: dbs }
+  - { filename: tnsnames.ora, sub_dir: network/admin }
+  loop_control:
+    loop_var: curr_file
+  tags:
+  - copy
+
+- block:
+  - include: upgrade_oracle.yml
+    vars:
+      oracle_home: "{{ new_oracle_home }}"
+    when:
+      - db_details.rc == 0
+      - current_oracle_home | regex_replace('.*/product/([^/]*).*', '\\1') != oracle_version
+      - inventory_hostname == master_node
+
+  - import_tasks: upgrade_postchecks.yml
+    vars:
+      oracle_home: "{{ new_oracle_home }}"
+    when: inventory_hostname == master_node
+    tags:
+    - postchecks
+
+  rescue:
+  - import_role:
+      name: oracle_api_services
+      tasks_from: db_checklist_post_update.yml
+    vars:
+      chklst_json_body:
+        new_entry: False
+        #ID: "{{ checklist_id }}"
+        db_install_status: FAILED
+    tags:
+    - apex_api
+
+  - fail:
+      msg: Oracle Upgrade failed
+
+- include_tasks: db_checklist_post_update.yml
+  vars:
+    #ID: "{{ checklist_id }}"
+    new_entry: False
+    db_install_status: SUCCESSFUL
+  tags:
+  - apex_api
+
+- include_role:
+    name: oracle_api_services
+    tasks_from: db_inventory_update.yml
+  vars:
+    db_invntry_update_body:
+      oracle_version: "{{ oracle_version }}"
+  tags:
+  - apex_api

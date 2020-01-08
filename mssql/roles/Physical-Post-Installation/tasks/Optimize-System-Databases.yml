@@ -1,0 +1,17 @@
+---
+- name: Copy Optimize-System-Databases file
+  win_template:
+    src: ../templates/Optimize-System-Databases-SQL2.j2
+    dest: c:\Ansible\Temp\Optimize-System-Databases-SQL2.ps1
+  diff: false
+
+- name: Optimize System Databases
+  win_shell: |
+     c:\Ansible\Temp\Optimize-System-Databases-SQL2.ps1 > c:\Ansible\Logs\Optimize-System-Databases-SQL2.log
+  register: Optimize
+  no_log: false
+
+- name: Protected Output - Optimize System Databases
+  debug:
+    var: "Optimize | combine({'cmd': Optimize.cmd | replace(SaPw, '<PASSWORD HIDDEN>') | replace(password, '<PASSWORD HIDDEN>')})"
+  failed_when: Optimize.rc

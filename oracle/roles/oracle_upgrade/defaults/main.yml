@@ -1,0 +1,17 @@
+---
+
+oracle_version: 12.1.0.2
+
+oracle_base: /u01/app/oracle
+
+oracle_db_name: db
+
+oracle_tmp: /u01/tmp/{{ oracle_db_name }}
+
+preupgrade_scripts_file: preupgrade_12.1.0.2.0_18_lf.zip
+
+execute_pre_fixup: false
+
+execute_post_fixup: true
+
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB

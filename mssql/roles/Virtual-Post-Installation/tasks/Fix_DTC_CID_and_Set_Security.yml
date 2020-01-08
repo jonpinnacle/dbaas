@@ -1,0 +1,10 @@
+---
+
+- name: Copy Fix DTC CID and Set Security file
+  win_copy:
+    src: ../files/Fix_DTC_CID_and_Set_Security.ps1
+    dest: c:\Ansible\Temp\Fix_DTC_CID_and_Set_Security.ps1
+
+- name: Fix DTC CID and Set Security
+  win_shell: |
+    C:\Ansible\Temp\Fix_DTC_CID_and_Set_Security.ps1 > C:\Ansible\Logs\Fix_DTC_CID_and_Set_Security.log

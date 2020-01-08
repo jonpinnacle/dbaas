@@ -1,0 +1,40 @@
+---
+oracle_version: 12.1.0.2
+grid_version: 12.1.0.2
+oracle_base: /u01/app/oracle
+
+# location for temporary files
+oracle_tmp: /u01/tmp/postval/{{ oracle_db_name }}
+oracle_user: oracle
+oracle_group: oinstall
+oracle_db_home: db_1
+oracle_db_name: oracle
+
+oracle_home: "{{ oracle_base }}/product/{{ oracle_version }}/{{ oracle_db_home }}"
+
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+oracle_grid_home: "{{ oracle_base }}/{{ grid_version }}/grid_1"
+
+# shell environment for the oracle user
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ oracle_sid | default('') }}"
+  ORACLE_UNQNAME: "{{ oracle_db_name | default('') }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ oracle_home }}/bin:{{ oracle_grid_home }}/bin:{{ ansible_env.PATH }}"
+  TMP: "/u01/app/oracle"
+  TMPDIR: "/u01/app/oracle"
+
+oracle_installer_path: https://vm0pnyumxxw0001.twcable.com/yum/source/ORACLE_DB
+
+pre_check_sqls:
+  - pre_check_profile.sql
+  - pre_check_default_profile.sql
+  - pre_check_block_change.sql
+  - pre_check_audit_purge.sql
+
+standard_task_id: "0"
+#vars to be taken care
+# ORACLE_SID

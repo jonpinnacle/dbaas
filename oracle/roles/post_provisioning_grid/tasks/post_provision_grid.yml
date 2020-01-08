@@ -1,0 +1,192 @@
+---
+- name: get oracle grid home
+  shell: "ps -ef | grep ohasd | grep /u01/app/{{ grid_version }}/ |  grep -v grep | awk -F ' ' '{ print $8 }'"
+  register: oracle_ohasd_process
+
+- name: set grid home
+  set_fact:
+    oracle_grid_home: "{{ oracle_ohasd_process.stdout | regex_replace('/bin/ohasd.bin', '') }}"
+
+- name: get asm_sid
+  shell: ps -ef | grep smon | grep ASM | grep -v grep | awk '{ print $8 }'
+  register: ps_grep_smon
+  changed_when: False
+
+- name: set asm_sid
+  set_fact:
+    asm_sid: "{{ ps_grep_smon.stdout | regex_replace('asm_smon_(.*)', '\\1') }}"
+
+# - name: host checklist post update for Post Grid
+#   include_tasks: host_checklist_post_update.yml
+#   vars:
+#     chklst_json_body:
+#       new_entry: true
+#       #ID: "{{ checklist_id }}"
+#       host_name: "{{ ansible_hostname }}"
+#       checklist_type: "POST PROVISION GRID"
+#       checklist_category: POST PROVISIONING
+#       post_build_status: STARTED
+#       ticket_ref: "{{ ticket_ref }}"
+#       task_desc:  Post Provision for Grid
+#   tags:
+#   - apex_api
+
+- name: db checklist status post for Post Grid Provisioning
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "POST PROVISION GRID"
+    task_id: "{{ ticket_ref }}"
+    task_status: "STARTED"
+    task_message: "POST PROVISIONING GRID for {{ ansible_hostname }} "
+    standard_task_id: "{{ standard_task_id }}"
+  tags:
+  - apex_api
+
+- block:
+  - name: Creating no sid entry in ORATAB file
+    lineinfile:
+     path: /etc/oratab
+     line: 'no_sid:{{ oracle_grid_home }}:N   # line added by Ansible'
+
+  - name: create directories for post validation setup
+    file:
+      path: "{{ dir_path }}"
+      owner: "{{ oracle_user }}"
+      group: "{{ oracle_group }}"
+      state: directory
+      recurse: yes
+    loop:
+      - "{{ oracle_base }}/admin/logs/archive"
+      - "{{ oracle_base }}/admin/scripts"
+      - "{{ oracle_base }}/admin/ctl"
+      - "{{ oracle_tmp }}"
+    loop_control:
+      loop_var: dir_path
+
+  - name: create the path to store the patch files
+    file:
+      path: "{{ oracle_installer_path }}/scripts"
+      state: directory
+      recurse: yes
+
+  - name: check if untar check file exists
+    stat:
+      path: "{{ oracle_base }}/admin/untar_complete"
+    register: untar_check
+
+  - name: "get {{ ojvm_patch }} from S3"
+    aws_s3:
+      aws_access_key: "{{ aws_access_key }}"
+      aws_secret_key: "{{ aws_secret_key }}"
+      bucket: gfcloudsoftwarerepo
+      object: "ORACLE_DB/scripts/{{ tars_file }}"
+      dest: "{{ oracle_installer_path }}/scripts/{{ tars_file }}"
+      mode: get
+    when: untar_check.stat.exists == false
+    loop:
+      - scripts.tar
+     # - etc.tar
+      - ctl.tar
+    loop_control:
+      loop_var: tars_file
+
+  - name: untar the tars
+    unarchive:
+      src: "{{ oracle_installer_path }}/scripts/{{ tars_file }}"
+      dest: "{{ oracle_base }}/admin/scripts"
+      remote_src: yes
+      validate_certs: no
+    when: untar_check.stat.exists == false
+    loop:
+      - scripts.tar
+     # - etc.tar
+      - ctl.tar
+    loop_control:
+      loop_var: tars_file
+
+  - name: place a marker for completion
+    file:
+      path: "{{ oracle_base }}/admin/untar_complete"
+      state: touch
+    when: untar_check.stat.exists == false
+
+  - include_tasks: cleanup_files_setup.yml
+
+  - name: Execute adrci setup
+    include_tasks: adrci_setup.yml
+    when: master_node == inventory_hostname
+
+  - name: Set up Directory in ORACLE_ADMIN
+    file:
+      group: "{{ oracle_group }}"
+      owner: "{{ oracle_user }}"
+      path: ‘{{ oracle_base }}/admin/chgctl’
+      state: directory
+
+  - name: place a marker for completion
+    file:
+      path: "{{ oracle_base }}/admin/.post_provisioning_done_{{ ansible_hostname }}"
+      state: touch
+      mode: 0400
+
+  # - name: host checklist post update for Post Grid
+  #   include_tasks: host_checklist_post_update.yml
+  #   vars:
+  #     chklst_json_body:
+  #       #ID: "{{ checklist_id }}"
+  #       new_entry: TRUE
+  #       host_name: "{{ ansible_hostname }}"
+  #       checklist_type: "POST PROVISION GRID"
+  #       checklist_category: POST PROVISIONING
+  #       post_build_status: SUCCESSFUL
+  #       ticket_ref: "{{ ticket_ref }}"
+  #       task_desc: 'EXECUTING Post Provisioning for Grid'
+  #   tags:
+  #     - apex_api
+
+  - name: db checklist status post for Post Grid Provisioning
+    import_role:
+      name: dbaas_api_services
+      tasks_from: db_checklist_status.yml
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_area: "POST PROVISION GRID"
+      task_id: "{{ ticket_ref }}"
+      task_status: "SUCCESSFUL"
+      task_message: "EXECUTED POST PROVISIONING GRID for {{ ansible_hostname }} "
+      standard_task_id: "{{ standard_task_id }}"
+    tags:
+    - apex_api
+
+  rescue:
+    # - name: host checklist post update for Post Grid
+    #   include_tasks: host_checklist_post_update.yml
+    #   vars:
+    #     chklst_json_body:
+    #       #ID: "{{ checklist_id }}"
+    #       new_entry: TRUE
+    #       host_name: "{{ ansible_hostname }}"
+    #       checklist_type: "POST PROVISION GRID"
+    #       checklist_category: POST PROVISIONING
+    #       post_build_status: FAILED
+    #       ticket_ref: "{{ ticket_ref }}"
+    #       task_desc: 'EXECUTING Post Provisioning for Grid'
+    #   tags:
+    #   - apex_api
+
+    - name: db checklist status post for Post Grid Provisioning
+      import_role:
+        name: dbaas_api_services
+        tasks_from: db_checklist_status.yml
+      vars:
+        task_key: "{{ ansible_hostname }}"
+        task_area: "POST PROVISION GRID"
+        task_id: "{{ ticket_ref }}"
+        task_status: "FAILED"
+        standard_task_id: "{{ standard_task_id }}"
+        task_message: "EXECUTED POST PROVISIONING GRID for {{ ansible_hostname }} "
+      tags:
+      - apex_api

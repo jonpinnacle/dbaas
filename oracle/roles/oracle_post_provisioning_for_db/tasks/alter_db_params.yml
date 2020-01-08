@@ -1,0 +1,15 @@
+---
+- name: Copy the "alter_db_params.sql" to server
+  template:
+    src: alter_db_params.sql.j2
+    dest: "{{ oracle_base }}/admin/scripts/{{ oracle_sid }}_alter_db_params.sql"
+    owner: "{{ oracle_user }}"
+    group: "{{ oracle_group }}"
+    mode: 0755
+
+- name: Run {{ oracle_sid }}_alter_db_params.sql script
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  command: "sqlplus -S -NOLOGINTIME / as sysdba @{{ oracle_base }}/admin/scripts/{{ oracle_sid }}_alter_db_params.sql"
+  register: "{{ oracle_sid }}_alter_db_params_result"

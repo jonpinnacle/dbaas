@@ -1,0 +1,14 @@
+---
+ 
+- name: create grid install rsp file
+  template:
+    src: 12c_gi_rsp.j2
+    dest: "{{ oracle_tmp }}/grid_install.rsp"
+  diff: false
+
+- name: create configTool rsp file
+  template:
+    src: grid_configTool.rsp.j2
+    dest: "{{ oracle_tmp }}/grid_configTool.rsp"
+  diff: false
+      

@@ -1,0 +1,17 @@
+---
+- name: Copy Run-SQL-Jobs-Script file
+  win_template: 
+    src: ../templates/Run-SQL-Jobs-Script-SQL2.j2
+    dest: c:\Ansible\Temp\Run-SQL-Jobs-Script-SQL2.ps1
+  diff: false
+
+- name: Run SQL Jobs Script
+  win_shell: |
+     c:\Ansible\Temp\Run-SQL-Jobs-Script-SQL2.ps1 > c:\Ansible\Logs\Run-SQL-Jobs-Script-SQL2.log
+  register: RunSQLJobs
+  no_log: false
+
+- name: Protected Output - Run SQL Jobs Script
+  debug:                                                                  
+    var: "RunSQLJobs | combine({'cmd': RunSQLJobs.cmd | replace(SaPw, '<PASSWORD HIDDEN>') | replace(password, '<PASSWORD HIDDEN>')})"
+  failed_when: RunSQLJobs.rc

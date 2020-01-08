@@ -1,0 +1,16 @@
+- name: host checklist insertion
+  include_tasks: host_checklist_insertion.yml
+  when: host_chklst_json_body.new_entry
+
+- name:  update the json data using PUT call
+  win_uri:
+    url:  "{{ apex_url }}/mssql_check_list/{{ checklist_id }"
+    validate_certs: no  # should be removed after https certs becomes renewed
+    method: PUT
+    body_format: json
+    body: "{{ host_chklst_json_body }}"
+    headers:
+        Content-Type: "application/json"
+  when: 
+  - checklist_id is defined
+  - checklist_id != ""

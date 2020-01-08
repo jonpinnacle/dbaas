@@ -1,0 +1,33 @@
+---
+
+- debug:
+    var: oracle_user
+
+- debug: 
+    var: ora_user_env
+    
+- name: check currently mounted disks
+  become: yes
+  become_user: "{{ oracle_user }}"
+  environment: "{{ ora_user_env }}"
+  command: asmcmd lsdg --suppressheader
+  register: asm_disks_list
+  changed_when: False
+
+- set_fact:
+    asm_disks: "{{ asm_disks | default('') + '\n' + asm_line | regex_search('MOUNTED.*') }}'"
+  loop: "{{ asm_disks_list.stdout_lines }}"
+  loop_control:
+    loop_var: asm_line
+
+- include_tasks: create_disk_group.yml
+  vars:
+    diskgroup_name: "{{ dg_name }}"
+    diskgroup_list: "{{ lookup('vars', 'asm_' + (dg_name | lower) + '_paths_find_result')}}"
+    diskgroup_redun: "{{ lookup('vars', 'asm_' + (dg_name | lower) + '_redun')}}"
+  when: dg_name not in asm_disks
+  loop: 
+  - "{{ asm_data_group }}"
+  - "{{ asm_reco_group }}"
+  loop_control:
+    loop_var: dg_name

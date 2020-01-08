@@ -1,0 +1,17 @@
+---
+#Note-In hosts file Place the Source Server at first and target in secound Place
+
+oracle_version: 12.1.0.2
+
+grid_version: 12.1.0.2
+
+install_base: /u01/app
+
+oracle_base: "{{ install_base }}/oracle"
+
+# oracle_db_home: grid
+
+# location for temporary files
+oracle_tmp: /u01/tmp/{{ oracle_version }}
+
+oracle_user: oracle

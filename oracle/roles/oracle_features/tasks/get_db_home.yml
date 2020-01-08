@@ -1,0 +1,37 @@
+---
+
+# TODO: Reenable it
+# - name: install lxml dependency
+#   yum:
+#     name: python-lxml
+#     state: present
+
+- name: check if inventory.xml exist
+  become: yes
+  stat:
+    path: "{{ install_base }}/oraInventory/ContentsXML/inventory.xml"
+  register: is_invntry_xml_exist
+  failed_when: is_invntry_xml_exist.stat.exists == false
+
+- name: get current oracle home locations
+  xml:
+    path: "{{ install_base }}/oraInventory/ContentsXML/inventory.xml"
+    xpath: /INVENTORY/HOME_LIST/HOME
+    content: attribute
+    attribute: LOC
+  register: ora_home_xpath
+
+- name: filter oracle home locations by version
+  set_fact:
+    ora_home_list: "{{ ora_home_xpath.matches |
+                        json_query('[*].HOME.LOC') |
+                        sort() }}"
+
+- name: write oracle homes to a file
+  copy:
+    content: "{% for home in ora_home_list %}{{ home }}\n{% endfor %}"
+    dest: /tmp/oraclehomesandgrids
+
+- name: get homes other than grid
+  shell: "cat /tmp/oraclehomesandgrids | grep -v grid"
+  register: listofhomes

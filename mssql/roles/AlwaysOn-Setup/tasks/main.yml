@@ -1,0 +1,59 @@
+---
+- name: Include variables
+  include_vars: Physical-Secrets.yml
+  no_log: True
+
+- name: Create Ansible Log and Temp  Directory
+  win_file:
+    path: "{{ ansible_directory }}"
+    state: directory
+  loop:
+  - C:\Ansible\Temp
+  - C:\Ansible\Logs
+  loop_control:
+    loop_var: ansible_directory
+
+- include: Enable-AlwaysOn.yml
+
+- include: CreateEmptyAvailabilityGroup-{{ node_count }}-Node-with-DR.yml
+  when: node_count == '2' and dr_flag
+
+- include: CreateEmptyAvailabilityGroup-2-Node.yml
+  when: node_count == '2' and not dr_flag|bool
+
+- include: CreateEmptyAvailabilityGroup-{{ node_count }}-Node-with-DR.yml
+  when: node_count == '3' and dr_flag
+
+- include: AAG-Configuration.yml
+  when: ((ansible_hostname | lower ) == ( PrimaryReplica | lower )) and dr_flag
+
+- name: Include AAG-Security-Cleanup File
+  include: AAG-Security-Cleanup.yml
+
+- name: Copy Restart SQL Agent
+  win_template:
+    src: Reboot-Agent.j2
+    dest: c:\Ansible\Temp\Reboot-Agent.ps1
+
+- name: Run Restart SQL Agent
+  win_shell:
+    c:\Ansible\Temp\Reboot-Agent.ps1
+
+- name: copy the query file
+  win_template:
+      src: ../templates/Run-Query.j2
+      dest: c:\Ansible\Temp\Run-Query.ps1
+  diff: false
+
+- name: Run Query
+  win_shell: |
+     C:\Ansible\Temp\Run-Query.ps1 > C:\Ansible\Logs\Run-Query.log
+  register: Run_Query
+  no_log: true
+  any_errors_fatal: true
+
+
+# - name: Remove tempdb Directory
+#   win_file:
+#     path: C:\Ansible\Temp
+#     state: absent

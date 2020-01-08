@@ -1,0 +1,50 @@
+---
+- include_vars: secrets.yml
+  no_log: True
+
+- name: get db details
+  command: grep "^{{ oracle_db_name }}:" /etc/oratab
+  register: db_details
+  changed_when: False
+
+- name: set oracle_home
+  set_fact:
+    oracle_home: "{{ db_details.stdout | regex_replace('^[^:]*:([^:]*).*', '\\1') }}"
+
+- include_tasks: CREATE_RMAN_SERVICE.yml
+   
+- name: Create RMAN User & Get DBID
+  become: yes
+  become_user: '{{ oracle_user }}'
+  environment: "{{ ora_user_env }}"
+  block:
+  - name: Copy the Create-RMAN-User.sql file
+    template: 
+      src: create-RMAN-user.j2
+      dest: "{{ oracle_tmp }}/create-RMAN-user.sql"
+
+  - name: run Create-RMAN-User.sql script
+    command: "sqlplus / as sysdba @{{ oracle_tmp }}/create-RMAN-user.sql"
+    register: opt2
+    failed_when: '"ERROR" in opt2.stdout'
+
+# #The Below task is specific to Charter environment.  
+# #It should be coded as is, but we won't execute it in the lab
+
+# # - name: Create Symbolic Link file
+# #   file:
+# #     src: "/usr/openv/netbackup/bin/libobk.so64"
+# #     dest: "{{ oracle_home }}/lib/libobk.so"
+# #     owner: oracle
+# #     group: oinstall
+# #     state: link
+
+# #The Below task is specific to Charter environment.  
+# #It should be coded as is, but we won't execute it in the lab
+
+# # - name: GET BACKNET DETAILS FROM HIGHEST NODE  
+# #   command: grep -i bn /etc/hosts 
+  
+- include_tasks: Configure_RMAN.yml
+
+- include_tasks: REGISTER_Database.yml

@@ -1,0 +1,61 @@
+---
+- import_tasks: copy_archives.yml
+
+- name: Copy files from {{ installer_location }}
+  win_robocopy:
+    src: '{{ installer_location }}\{{ files.source }}'
+    dest: "{{ files.dest }}"
+    recurse: yes
+    flags: "{{ files.flag }}"
+  loop:
+#  - { source: 'SQL-CFG\PowerShellModules', dest: 'C:\Program Files\WindowsPowerShell\Modules' , flag: '/E' }
+  - { source: 'SQL-CFG', dest: 'D:\Install\SQL-CFG' , flag: '/E' }
+#  - { source: 'IseriesDriver\Iseries_64 bit', dest: 'D:\Install\IBM\Iseries_64 bit' , flag: '/MIR' }
+#  - { source: 'IseriesDriver', dest: 'D:\Install\IBM', flag: 'IbmClient*.iss'}
+#  - { source: 'Oracle Client', dest: 'D:\Install\Oracle\12C' , flag: '/MIR' }
+#  - { source: 'SQL{{ SqlVersion }}\InstallPatches', dest: 'D:\Install\SQL{{ SqlVersion }}\InstallPatches' , flag: '/MIR' }
+  - { source: '.', dest: 'D:\Install\SQL{{ SqlVersion }}' , flag: 'SQLServer2005_BC_x64*.msi' }
+  - { source: '.', dest: 'D:\Install\SQL{{ SqlVersion }}' , flag: 'en_sql_server_{{ SqlVersion }}*.iso' }
+#  - { source: 'SQL{{ SqlVersion }}', dest: 'D:\Install\SQL{{ SqlVersion }}' , flag: '*Configuration*' }
+#  - { source: 'SQL{{ SqlVersion }}', dest: 'D:\Install\SQL{{ SqlVersion }}' , flag: '{% if (Env1 == "PRD" or Env1 == "DR") %} *enterprise* {% else %} *developer* {% endif %} ' }
+  loop_control:
+    loop_var: files
+
+- name: Copy the files only for 2016/2017
+  win_robocopy:
+    src: '{{ installer_location }}\{{ SSMS.source }}'
+    dest: "{{ SSMS.dest }}"
+    recurse: yes
+    flags: "{{ SSMS.flag }}"
+  when: SqlVersion == 2017 or SqlVersion == 2016
+  loop:
+  - { source: 'SQL{{ SqlVersion }}\SSMS', dest: 'D:\Install\SQL{{ SqlVersion }}\SSMS' , flag: '/MIR' }
+  loop_control:
+    loop_var: SSMS
+  
+- name: Create System Path Directory
+  win_file:
+    path: "{{ SourceDir }}"
+    state: directory
+  loop:
+  - '{{ SystemPath }}\DBA'
+  - '{{ SystemPath }}\DBA\Scripts'
+  - '{{ SystemPath }}\DBA\Reports'
+  - '{{ SystemPath }}\DBA\OutPut'
+  loop_control:
+    loop_var: SourceDir
+
+#- name: Copy the files locally
+#  win_robocopy:
+#    src: "{{ localDir.source }}"
+#    dest: "{{ localDir.dest }}"
+#    flags: "{{ localDir.flag }}"
+#  loop:
+#  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}\DBA\Scripts' , flag: '*.ps1' }
+#  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}\DBA\Scripts\', flag: '*.vbs'  }
+#  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}\DBA\Scripts\', flag: '"Daily SQL Audit - HTML RMO.sql"'  }
+#  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}\DBA\Scripts\', flag: 'script_users_for_db_refresh.sql'  }
+#  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}\DBA\Scripts\', flag: 'DBA_-_Collect_Inventory_Info.sql'  }
+#  - { source: 'D:\Install\SQL-CFG', dest: '{{ SystemPath }}\DBA\Reports\', flag: '*.rdl'  }
+#  loop_control:
+#    loop_var: localDir

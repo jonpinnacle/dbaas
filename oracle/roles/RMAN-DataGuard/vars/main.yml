@@ -1,0 +1,18 @@
+---
+master_node: "{{ ansible_play_hosts | sort | first }}"
+
+#Add target details in TNS (tnsnames.ora)
+#Dont use same name/values for below variables(source_db and target_db)
+
+source_db: "{{ oracle_db_name }}"
+
+target_db: "{{ oracle_db_name }}_stby"
+
+# shell environment for the oracle user- Source Server
+ora_user_env:
+  ORACLE_BASE: "{{ oracle_base }}"
+  ORACLE_SID: "{{ oracle_db_name }}"
+  ORACLE_UNQNAME: "{{ oracle_db_name }}"
+  ORACLE_HOME: "{{ oracle_home }}"
+  NLS_LANG: "American_America.UTF8"
+  PATH: "{{ oracle_home }}/bin:{{ ansible_env.PATH }}"

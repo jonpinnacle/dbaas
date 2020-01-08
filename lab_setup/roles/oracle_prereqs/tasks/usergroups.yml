@@ -1,0 +1,93 @@
+---
+- name: create initial groups for the oracle user
+  group:
+    name: "{{ item.name }}"
+    gid: "{{ item.ID }}"
+    state: present
+  with_items: "{{ oracle_groups }}"
+
+- name: create oracle user
+  user:
+    name: "{{ oracle_user.name }}"
+    group: "{{ oracle_groups[0].name }}"
+    uid: "{{ oracle_user.id }}"
+    groups: "{{ oracle_groups | json_query('[].name') | join(',')}}"
+    home: "/home/{{ oracle_user.name }}"
+    shell: /bin/bash 
+    password: "{{ oracle_pass | password_hash('sha512') }}"
+    append: yes
+  when:
+    - ansible_user != oracle_user.name
+
+- name: execute if the ansible user is the oracle user
+  block:
+  - name: add the oracle users to the groups
+    shell: |
+      sleep 10
+      usermod -a -G {{ oracle_groups | json_query('[].name') | join(',')}} {{ oracle_user.name }}
+    register: async_sleeper
+    async: 30
+    poll: 0
+
+  - name: give the system the time to update the user
+    pause:
+      seconds: 15
+    delegate_to: localhost
+    run_once: True
+
+  - name: check the command to add the user to the groups
+    async_status:
+      jid: '{{ async_sleeper.ansible_job_id }}'
+  when:
+    - ansible_user == oracle_user.name
+
+- name: set oracle user environment
+  lineinfile:
+    dest: "/home/{{ oracle_user.name }}/.bashrc"
+    state: present
+    line: "{{ item }}"
+  with_items:
+    - "export TMP=/tmp"
+    - "export TMPDIR=$TMP"
+    - "export ORACLE_HOSTNAME={{ inventory_hostname }}"
+    - "export ORACLE_BASE={{ ora_user_env.ORACLE_BASE }}"
+    - "export GRID_HOME=/u01/app/12.1.0.2/grid" # Perhaps a check for version before doing this one?
+    - "export ORACLE_SID={{ ora_user_env.ORACLE_SID }}"
+    - "export ORACLE_UNQNAME={{ ora_user_env.ORACLE_UNQNAME }}"
+    - "export DB_HOME={{ ora_user_env.ORACLE_HOME }}"
+    - "export ORACLE_HOME=$DB_HOME"
+    - "export NLS_LANG={{ ora_user_env.NLS_LANG }}"
+    - "export ORACLE_TERM=xterm"
+    - "export BASE_PATH=/usr/sbin:$PATH"
+    - "export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib"
+    - "export CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib"
+    - "alias grid_env=`. /home/oracle/grid_env`"
+    - "alias db_env=`. /home/oracle/db_env`"
+
+- name: update PATH for oracle user
+  lineinfile: 
+    path: /home/{{ oracle_user.name }}/.bashrc
+    regexp: "^export PATH"
+    line: "export PATH=$PATH:$ORACLE_HOME/bin:$BASE_PATH:$HOME/bin"
+
+- name: copy grid_env file
+  copy:
+    dest: /home/{{ oracle_user.name }}/grid_env
+    content: |
+      export ORACLE_SID=+ASM 
+      export ORACLE_HOME=$GRID_HOME 
+      export PATH=$ORACLE_HOME/bin:$BASE_PATH 
+
+      export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib 
+      export CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib
+      
+- name: copy db_env file
+  copy:
+    dest: /home/{{ oracle_user.name }}/db_env
+    content: |
+      export ORACLE_SID="{{ oracle_db_name }}"
+      export ORACLE_HOME=$DB_HOME
+      export PATH=$ORACLE_HOME/bin:$BASE_PATH
+
+      export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib
+      export CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib

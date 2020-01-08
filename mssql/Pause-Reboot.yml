@@ -1,0 +1,7 @@
+- name: Pause-Instance Become Availabe after Reboot
+  gather_facts: false
+#  hosts: Physical-Windows
+  hosts: '{{ host }}'
+  tasks:
+    - name: Pause
+      pause: minutes=1

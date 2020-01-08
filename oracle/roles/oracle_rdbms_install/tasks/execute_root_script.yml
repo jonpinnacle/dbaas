@@ -1,0 +1,52 @@
+---
+- name: oracle post-installation
+  block:
+  - name: db-specific oracle post-installation
+    command: "{{ oracle_home }}/root.sh"
+    register: root_script
+
+  always:
+  - name: save root script stdout
+    copy:
+      dest: "{{ oracle_tmp }}/root_script_rdbms.out"
+      content: "{{ root_script.stdout | default('') }}"
+    when: root_script.changed
+
+  - name: save root script  stderr
+    copy:
+      dest: "{{ oracle_tmp }}/root_script_rdbms.err"
+      content: "{{ root_script.stderr | default('') }}"
+    when: root_script.changed
+
+  # Need actual log location ##
+  # the log file is /u01/app/oracle/product/12.1.0.2/db_2/install/root_dbtest04.techlab.com_2018-08-24_06-13-45.log
+  - name: Get files in a folder
+    find:
+      paths: "{{ oracle_home }}/install/"
+      patterns: "root_{{ ansible_hostname }}*.log"
+    register: log_files
+
+  # - name: Upload Logs for RDBMS Installation
+  #   include_tasks: upload_log.yml
+  #   vars:
+  #     logfile_path: "{{ log_files.files | sort(attribute='mtime',reverse=true) | first | json_query('path') }}"
+  #     log_file_desc:
+  #   tags:
+  #   - apex_api
+
+- name: db checklist status file upload for RDBMS Root.sh
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status_file.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "RDBMS Software Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "Upload root.sh"
+    task_message: "Root.sh for RDBMS Install Log {{ ansible_hostname }} "
+    file_mimetype: "text/plain"
+    record_type: "file_upload"
+    standard_task_id: "{{ standard_task_id }}"
+    logfile_path:  "{{ log_files.files | sort(attribute='mtime',reverse=true) | first | json_query('path') }}"
+  tags:
+  - apex_api

@@ -1,0 +1,72 @@
+---
+- name: db checklist status post for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Grid Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "IN_PROGRESS"
+    standard_task_id: "{{ standard_task_id_val }}"
+    task_message: "Running Configtool for Grid Infrastructure on {{ ansible_hostname }} "
+  when: inventory_hostname == master_node
+  tags:
+  - apex_api
+
+  - name: run grid configTool
+    environment: "{{ ora_user_env }}"
+    become: yes
+    become_user: "{{ oracle_user }}"
+    shell: |
+      nohup {{ oracle_grid_home }}/cfgtoollogs/configToolAllCommands RESPONSE_FILE={{ oracle_tmp }}/grid_configTool.rsp 2>&1 | tee {{ oracle_tmp }}/config_stdout.out &
+      sleep 30
+      while true
+      do
+        c=$(ps -ef | grep -v grep | grep grid_configTool.rsp | grep java | wc -l)
+        [ $c -eq 0 ] && break
+        sleep 10
+      done
+    args:
+      executable: /bin/bash
+    register: configTool
+    failed_when: '"The action configuration has failed its perform method" in configTool.stdout'
+    when:
+    - inventory_hostname == master_node
+    - 'oracle_grid_home + "/cfgtoollogs/configToolAllCommands RESPONSE_FILE=<response_file>" in hostvars[master_node]["grid_install"]["stdout"]'
+
+- name: db checklist status post for Grid Install
+  import_role:
+    name: dbaas_api_services
+    tasks_from: db_checklist_status.yml
+  vars:
+    task_key: "{{ ansible_hostname }}"
+    task_area: "Grid Install"
+    task_id: "{{ ticket_ref }}"
+    task_status: "IN_PROGRESS"
+    standard_task_id: "{{ standard_task_id_val }}"
+    task_message: "Completed Configtool for Grid Infrastructure on {{ ansible_hostname }} "
+  when: inventory_hostname == master_node
+  tags:
+  - apex_api
+
+
+  rescue:
+  - name: db checklist status post for Grid Install
+    import_role:
+      name: dbaas_api_services
+      tasks_from: db_checklist_status.yml
+    vars:
+      task_key: "{{ ansible_hostname }}"
+      task_area: "Grid Install"
+      task_id: "{{ ticket_ref }}"
+      task_status: "FAILED"
+      standard_task_id: "{{ standard_task_id_val }}"
+      task_message: "Failed Configtool execution Grid Infrastructure for {{ ansible_hostname }} "
+    when: inventory_hostname == master_node
+    tags:
+    - apex_api
+
+  - name: Install Failed
+    fail:
+      msg: GI Install Failed

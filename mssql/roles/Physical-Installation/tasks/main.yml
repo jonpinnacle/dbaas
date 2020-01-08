@@ -1,0 +1,120 @@
+---
+- include_vars: Physical-Secrets.yml
+  no_log: True
+
+- name: Create Directory
+  win_file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+     - D:\Program Files\Microsoft SQL Server
+     - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\DATA'
+     - '{{ DataPath }}\MSSQL\Data'
+     - '{{ LogPath }}\MSSQL\Logs'
+     - '{{ TempdbPath }}\MSSQL\Data'
+
+- name: Uncompressed the Directory
+  win_shell: |
+     compact /s /u "D:\Program Files\Microsoft SQL Server"
+     compact /s /u "{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\DATA"
+     compact /s /u "{{ DataPath }}\MSSQL\Data"
+     compact /s /u "{{ LogPath }}\MSSQL\Logs"
+     compact /s /u "{{ TempdbPath }}\MSSQL\Data"
+
+##########################################################################
+## Possibly could be accomplished with:                                 ##
+##  - win_disk_image - to mount/unmount ISO                             ##
+##    (https://docs.ansible.com/ansible/2.4/win_disk_image_module.html) ##
+##  - win_package - to install.                                         ##
+##    It's possible this won't work and win_shell will be required      ##
+##    If so, the 'creates' field could be used for idempotency          ##
+##                                                                      ##
+##  Jinja filters could probably make this much simpler as well         ##
+##########################################################################
+- name: Check if MSSQLSERVER service is installed
+  win_service:
+    name: MSSQLSERVER
+  register: MSSQLservice_info
+
+- include: Install-SQL.yml
+  when: MSSQLservice_info.exists == false
+
+- name: Find latest log file
+  win_find:
+    paths: c:\Program Files\Microsoft SQL Server\
+    age: -15m
+    patterns: 'Summary.txt'
+    recurse: yes
+  register: logfile
+  when: MSSQLservice_info.exists == false
+
+- name: read output
+  win_shell:
+    'gc "{{ logfile.files[0].path }}"'
+  register: checklog
+  failed_when: '"Failed" in checklog.stdout'
+  when: MSSQLservice_info.exists == false
+
+- name: Create local Directory
+  win_file:
+    path: "{{ SourceDir }}"
+    state: directory
+  loop:
+  - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\Output'
+  - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS'
+  - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Checkpoints'
+  - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Configurations'
+  - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\ErrorFiles'
+  - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Logs'
+  - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\OutPutFiles'
+  - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Packages'
+  - '{{ SystemPath }}\MSSQL{{ ext }}.MSSQLSERVER\MSSQL\SSIS\Raw Files'
+  loop_control:
+    loop_var: SourceDir
+
+########################################################
+## There is no way to accomplish this via modules     ##
+## However, it can still be idempotent.               ##
+## Suggestion:                                        ##
+## Add a Reg entry with servername to show completion ##
+##   requested reg_entry: Ansible/task_name           ##
+########################################################
+- name: Check if MSDTC service is installed
+  win_service:
+    name: MSDTC
+  register: MSDTCservice_info
+
+- name: Fix DTC CID and Set Security
+  win_shell: |
+    #Stop-Dtc -DtcName "Local" –Confirm:$False
+    #Uninstall-Dtc –Confirm:$False
+    Install-Dtc -LogPath "C:\windows\system32\MSDtc" -StartType "AutoStart"
+    Start-Dtc -DtcName "Local"
+    Set-DtcNetworkSetting -DtcName Local -AuthenticationLevel Incoming -InboundTransactionsEnabled 1 -OutboundTransactionsEnabled 1 -RemoteClientAccessEnabled 1 -RemoteAdministrationAccessEnabled 1 -XATransactionsEnabled 1 -confirm:$false
+  when: MSDTCservice_info.exists == false
+
+- name: regedit to PowerShell Security Fix
+  win_regedit:
+    path: 'HKLM:\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.SqlServer.Management.PowerShell.sqlps{{ ext }}0'
+    name: ExecutionPolicy
+    data: Unrestricted
+
+# Need to remove the below comment while running on Charter Environment
+# Missing "$unc\SQL2008R2" SQLServer2005_BC_x64*.msi" in given media
+- name: Install Install-Backward-Compatibility-Objects
+  win_package:
+    path: 'D:\Install\SQL{{ SqlVersion }}\SQLServer2005_BC_x64.msi'
+
+#######################################################################
+## Added generic checks here but the installs will need some updates ##
+## for this to work.  The 'win_package' module should also have a    ##
+## "reboot_required" field that could be checked instead.            ##
+#######################################################################
+- name: Reboot Server
+  win_reboot:
+    pre_reboot_delay: 10
+    post_reboot_delay: 0
+    test_command: whoami
+    reboot_timeout: 600
+    msg: Reboot initiated by Ansible
+    connect_timeout: 5
